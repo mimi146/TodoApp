@@ -23,11 +23,17 @@ export async function POST(request) {
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10)
 
+        // Generate recovery code (8 characters uppercase)
+        const crypto = require('crypto')
+        const recoveryCode = crypto.randomBytes(4).toString('hex').toUpperCase()
+        const hashedRecoveryCode = await bcrypt.hash(recoveryCode, 10)
+
         // Create user
         const result = await db.collection('users').insertOne({
             email: email.toLowerCase(),
             password: hashedPassword,
             name,
+            recoveryCode: hashedRecoveryCode,
             createdAt: new Date()
         })
 
@@ -38,7 +44,8 @@ export async function POST(request) {
             user: {
                 id: result.insertedId,
                 email: email.toLowerCase(),
-                name
+                name,
+                recoveryCode // Return plain code once
             }
         }, { status: 201 })
     } catch (error) {

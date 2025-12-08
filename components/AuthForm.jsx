@@ -13,6 +13,49 @@ export default function AuthForm({ mode = 'login' }) {
 
     const isSignup = mode === 'signup'
 
+    const [recoveryCode, setRecoveryCode] = useState('')
+
+    // Show recovery code if just signed up
+    if (recoveryCode) {
+        return (
+            <div className="auth-container">
+                <div className="auth-card">
+                    <h1 style={{ color: 'var(--primary-color)' }}>Account Created!</h1>
+                    <p className="auth-subtitle">Please save your recovery code securely.</p>
+
+                    <div style={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        padding: '20px',
+                        borderRadius: '12px',
+                        textAlign: 'center',
+                        margin: '20px 0',
+                        fontSize: '1.5rem',
+                        fontWeight: 'bold',
+                        letterSpacing: '2px',
+                        border: '2px dashed var(--primary-color)'
+                    }}>
+                        {recoveryCode}
+                    </div>
+
+                    <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#ff6b6b', marginBottom: '20px' }}>
+                        ⚠️ IMPORTANT: This code is required to reset your password if you forget it. We cannot recover it for you.
+                    </p>
+
+                    <button
+                        onClick={() => {
+                            router.push('/')
+                            router.refresh()
+                        }}
+                        className="auth-button"
+                        style={{ width: '100%' }}
+                    >
+                        I've Saved It - Continue
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault()
         setError('')
@@ -38,7 +81,14 @@ export default function AuthForm({ mode = 'login' }) {
                 return
             }
 
-            // Success - redirect to home
+            // If signup successful, show recovery code instead of redirecting
+            if (isSignup && data.user.recoveryCode) {
+                setRecoveryCode(data.user.recoveryCode)
+                setLoading(false)
+                return
+            }
+
+            // Login success - redirect to home
             router.push('/')
             router.refresh()
         } catch (err) {
@@ -93,6 +143,13 @@ export default function AuthForm({ mode = 'login' }) {
                             minLength={6}
                             placeholder="••••••••"
                         />
+                        {!isSignup && (
+                            <div style={{ textAlign: 'right', marginTop: '4px' }}>
+                                <a href="/auth/reset-password" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textDecoration: 'none' }}>
+                                    Forgot Password?
+                                </a>
+                            </div>
+                        )}
                     </div>
 
                     {error && <div className="auth-error">{error}</div>}
