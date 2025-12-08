@@ -13,6 +13,7 @@ export default function TodoApp() {
     const [isRunning, setIsRunning] = useState(false)
     const [pomodoroMinutes, setPomodoroMinutes] = useState(25)
     const [currentSlokaIndex, setCurrentSlokaIndex] = useState(0)
+    const [loading, setLoading] = useState(true)
 
     // Refs for timer
     const timerInterval = useRef(null)
@@ -31,18 +32,25 @@ export default function TodoApp() {
         "प्रज्ञावादांश्च भाषसे।\nगतासूनगतासूंश्च नानुशोचन्ति पण्डिताः॥\n\n(The wise grieve neither for the living nor for the dead.)"
     ]
 
-    // Load todos from localStorage
+    // Load todos from MongoDB
     useEffect(() => {
-        const stored = localStorage.getItem('todos')
-        if (stored) {
-            setTodos(JSON.parse(stored))
-        }
+        fetchTodos()
     }, [])
 
-    // Save todos to localStorage
-    useEffect(() => {
-        localStorage.setItem('todos', JSON.stringify(todos))
-    }, [todos])
+    const fetchTodos = async () => {
+        try {
+            setLoading(true)
+            const res = await fetch('/api/todos')
+            const data = await res.json()
+            if (data.todos) {
+                setTodos(data.todos)
+            }
+        } catch (error) {
+            console.error('Error fetching todos:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
 
     // Load timer state and auto-resume
     useEffect(() => {
@@ -114,29 +122,63 @@ export default function TodoApp() {
     }, [])
 
     // Todo functions
-    const addTodo = (e) => {
+    const addTodo = async (e) => {
         e.preventDefault()
         if (todoInput.trim()) {
-            const newTodo = {
-                id: Date.now(),
-                text: todoInput.trim(),
-                completed: false,
-                priority: todoPriority
+            try {
+                const res = await fetch('/api/todos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: todoInput.trim(),
+                        priority: todoPriority
+                    })
+                })
+                const data = await res.json()
+                if (data.todo) {
+                    setTodos([...todos, data.todo])
+                    setTodoInput('')
+                    setTodoPriority('medium')
+                }
+            } catch (error) {
+                console.error('Error adding todo:', error)
             }
-            setTodos([...todos, newTodo])
-            setTodoInput('')
-            setTodoPriority('medium')
         }
     }
 
-    const toggleTodo = (id) => {
-        setTodos(todos.map(todo =>
-            todo.id === id ? { ...todo, completed: !todo.completed } : todo
-        ))
+    const toggleTodo = async (id) => {
+        const todo = todos.find(t => t._id === id)
+        if (!todo) return
+
+        try {
+            const res = await fetch(`/api/todos/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ completed: !todo.completed })
+            })
+
+            if (res.ok) {
+                setTodos(todos.map(t =>
+                    t._id === id ? { ...t, completed: !t.completed } : t
+                ))
+            }
+        } catch (error) {
+            console.error('Error toggling todo:', error)
+        }
     }
 
-    const deleteTodo = (id) => {
-        setTodos(todos.filter(todo => todo.id !== id))
+    const deleteTodo = async (id) => {
+        try {
+            const res = await fetch(`/api/todos/${id}`, {
+                method: 'DELETE'
+            })
+
+            if (res.ok) {
+                setTodos(todos.filter(todo => todo._id !== id))
+            }
+        } catch (error) {
+            console.error('Error deleting todo:', error)
+        }
     }
 
     // Priority order for sorting
@@ -361,22 +403,32 @@ export default function TodoApp() {
                     </div>
 
                     <ul className="todo-list">
-                        {filteredTodos.map(todo => (
-                            <li key={todo.id} className={`todo-item ${todo.completed ? 'completed' : ''}`}>
-                                <input
-                                    type="checkbox"
-                                    checked={todo.completed}
-                                    onChange={() => toggleTodo(todo.id)}
-                                />
-                                <span className="todo-text">{todo.text}</span>
-                                <span className={`priority-badge ${todo.priority}`}>
-                                    {todo.priority}
-                                </span>
-                                <button onClick={() => deleteTodo(todo.id)} className="delete-btn">
-                                    Delete
-                                </button>
+                        {loading ? (
+                            <li style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                                Loading todos...
                             </li>
-                        ))}
+                        ) : filteredTodos.length === 0 ? (
+                            <li style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                                No todos yet. Add one above!
+                            </li>
+                        ) : (
+                            filteredTodos.map(todo => (
+                                <li key={todo._id} className={`todo-item ${todo.completed ? 'completed' : ''}`}>
+                                    <input
+                                        type="checkbox"
+                                        checked={todo.completed}
+                                        onChange={() => toggleTodo(todo._id)}
+                                    />
+                                    <span className="todo-text">{todo.text}</span>
+                                    <span className={`priority-badge ${todo.priority}`}>
+                                        {todo.priority}
+                                    </span>
+                                    <button onClick={() => deleteTodo(todo._id)} className="delete-btn">
+                                        Delete
+                                    </button>
+                                </li>
+                            ))
+                        )}
                     </ul>
 
                     <div className="todo-stats">
