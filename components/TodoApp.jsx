@@ -179,15 +179,26 @@ export default function TodoApp() {
     }
 
     const deleteTodo = async (id) => {
+        // Store the todo in case we need to restore it
+        const todoToDelete = todos.find(t => t._id === id)
+        if (!todoToDelete) return
+
+        // Optimistic update - remove from UI immediately
+        setTodos(todos.filter(todo => todo._id !== id))
+
         try {
             const res = await fetch(`/api/todos/${id}`, {
                 method: 'DELETE'
             })
 
-            if (res.ok) {
-                setTodos(todos.filter(todo => todo._id !== id))
+            if (!res.ok) {
+                // Restore on error
+                setTodos([...todos])
+                console.error('Error deleting todo')
             }
         } catch (error) {
+            // Restore on error
+            setTodos([...todos])
             console.error('Error deleting todo:', error)
         }
     }
