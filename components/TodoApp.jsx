@@ -150,6 +150,11 @@ export default function TodoApp() {
         const todo = todos.find(t => t._id === id)
         if (!todo) return
 
+        // Optimistic update - update UI immediately
+        setTodos(todos.map(t =>
+            t._id === id ? { ...t, completed: !t.completed } : t
+        ))
+
         try {
             const res = await fetch(`/api/todos/${id}`, {
                 method: 'PUT',
@@ -157,12 +162,18 @@ export default function TodoApp() {
                 body: JSON.stringify({ completed: !todo.completed })
             })
 
-            if (res.ok) {
+            if (!res.ok) {
+                // Revert on error
                 setTodos(todos.map(t =>
-                    t._id === id ? { ...t, completed: !t.completed } : t
+                    t._id === id ? { ...t, completed: todo.completed } : t
                 ))
+                console.error('Error toggling todo')
             }
         } catch (error) {
+            // Revert on error
+            setTodos(todos.map(t =>
+                t._id === id ? { ...t, completed: todo.completed } : t
+            ))
             console.error('Error toggling todo:', error)
         }
     }
@@ -416,10 +427,17 @@ export default function TodoApp() {
                                 <li key={todo._id} className={`todo-item ${todo.completed ? 'completed' : ''}`}>
                                     <input
                                         type="checkbox"
+                                        className="todo-checkbox"
                                         checked={todo.completed}
                                         onChange={() => toggleTodo(todo._id)}
                                     />
-                                    <span className="todo-text">{todo.text}</span>
+                                    <span
+                                        className="todo-text"
+                                        onClick={() => toggleTodo(todo._id)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        {todo.text}
+                                    </span>
                                     <span className={`priority-badge ${todo.priority}`}>
                                         {todo.priority}
                                     </span>
