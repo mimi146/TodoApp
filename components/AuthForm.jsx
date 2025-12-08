@@ -140,7 +140,6 @@ export default function AuthForm({ mode = 'login' }) {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            minLength={6}
                             placeholder="••••••••"
                         />
                         {!isSignup && (
