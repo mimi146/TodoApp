@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaishnava Teachings - Eternal Wisdom</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header .om-symbol {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .sloka-container {
+            animation: fadeIn 1s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .sloka-sanskrit {
+            font-size: 1.8rem;
+            line-height: 1.8;
+            margin-bottom: 25px;
+            text-align: center;
+            font-style: italic;
+            color: #ffe5b4;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .sloka-translation {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            margin-bottom: 30px;
+            text-align: justify;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #ffe5b4;
+        }
+
+        .reference {
+            text-align: right;
+            font-size: 1.1rem;
+            color: #ffd700;
+            font-weight: bold;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .reference .book {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .reference .chapter-verse {
+            font-size: 1rem;
+            color: #ffec8b;
+        }
+
+        .counter {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .timer {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .navigation {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .nav-btn:active {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 25px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .sloka-sanskrit {
+                font-size: 1.4rem;
+            }
+
+            .sloka-translation {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="om-symbol">ॐ</div>
+            <h1>Vaishnava Teachings</h1>
+            <p>Eternal Wisdom from Sacred Scriptures</p>
+        </div>
+
+        <div class="sloka-container" id="slokaContainer">
+            <!-- Sloka content will be inserted here -->
+        </div>
+
+        <div class="counter">
+            <div>Sloka <span id="currentSloka">1</span> of <span id="totalSlokas">30</span></div>
+            <div class="timer">Next rotation in: <span id="timer">10:00</span></div>
+        </div>
+
+        <div class="navigation">
+            <button class="nav-btn" onclick="previousSloka()">← Previous</button>
+            <button class="nav-btn" onclick="nextSloka()">Next →</button>
+        </div>
+    </div>
+
+    <script>
+        const slokas = [
+            {
+                sanskrit: "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन ।\nमा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि ॥",
+                translation: "You have a right to perform your prescribed duty, but you are not entitled to the fruits of action. Never consider yourself to be the cause of the results of your activities, and never be attached to not doing your duty.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 2",
+                verse: "Verse 47"
+            },
+            {
+                sanskrit: "अनन्याश्चिन्तयन्तो मां ये जनाः पर्युपासते ।\nतेषां नित्याभियुक्तानां योगक्षेमं वहाम्यहम् ॥",
+                translation: "To those who are constantly devoted and worship Me with love, I give the understanding by which they can come to Me. I personally take care of both their material needs and spiritual assets.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 9",
+                verse: "Verse 22"
+            },
+            {
+                sanskrit: "सर्वधर्मान्परित्यज्य मामेकं शरणं व्रज ।\nअहं त्वां सर्वपापेभ्यो मोक्षयिष्यामि मा शुचः ॥",
+                translation: "Abandon all varieties of religion and just surrender unto Me. I shall deliver you from all sinful reactions. Do not fear.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 18",
+                verse: "Verse 66"
+            },
+            {
+                sanskrit: "न जायते म्रियते वा कदाचिन्\nनायं भूत्वा भविता वा न भूयः ।\nअजो नित्यः शाश्वतोऽयं पुराणो\nन हन्यते हन्यमाने शरीरे ॥",
+                translation: "For the soul there is neither birth nor death at any time. It has not come into being, does not come into being, and will not come into being. It is unborn, eternal, ever-existing and primeval. It is not slain when the body is slain.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 2",
+                verse: "Verse 20"
+            },
+            {
+                sanskrit: "उद्धरेदात्मनात्मानं नात्मानमवसादयेत् ।\nआत्मैव ह्यात्मनो बन्धुरात्मैव रिपुरात्मनः ॥",
+                translation: "One must deliver himself with the help of his mind, and not degrade himself. The mind is the friend of the conditioned soul, and his enemy as well.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 6",
+                verse: "Verse 5"
+            },
+            {
+                sanskrit: "अहं सर्वस्य प्रभवो मत्तः सर्वं प्रवर्तते ।\nइति मत्वा भजन्ते मां बुधा भावसमन्विताः ॥",
+                translation: "I am the source of all spiritual and material worlds. Everything emanates from Me. The wise who perfectly know this engage in My devotional service and worship Me with all their hearts.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 10",
+                verse: "Verse 8"
+            },
+            {
+                sanskrit: "सर्वस्य चाहं हृदि सन्निविष्टो\nमत्तः स्मृतिर्ज्ञानमपोहनं च ।\nवेदैश्च सर्वैरहमेव वेद्यो\nवेदान्तकृद्वेदविदेव चाहम् ॥",
+                translation: "I am seated in everyone's heart, and from Me come remembrance, knowledge and forgetfulness. By all the Vedas, I am to be known. Indeed, I am the compiler of Vedanta, and I am the knower of the Vedas.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 15",
+                verse: "Verse 15"
+            },
+            {
+                sanskrit: "जन्माद्यस्य यतोऽन्वयादितरतश्चार्थेष्वभिज्ञः स्वराट् ।\nतेने ब्रह्म हृदा य आदिकवये मुह्यन्ति यत्सूरयः ।",
+                translation: "O my Lord, the Absolute Truth, You are the original source from whom everything emanates. You are directly and indirectly conscious of all manifestations, and You are fully independent.",
+                book: "Srimad Bhagavatam",
+                chapter: "Canto 1, Chapter 1",
+                verse: "Verse 1"
+            },
+            {
+                sanskrit: "कलिं सभाजयन्त्यार्या गुणज्ञाः सारभागिनः ।\nयत्र सङ्कीर्तनेनैव सर्वस्वार्थोऽभिलभ्यते ॥",
+                translation: "Those who are advanced and spiritually intelligent praise this age of Kali because in this age all perfections of life can simply be achieved by the congregational chanting of the holy names of the Lord.",
+                book: "Srimad Bhagavatam",
+                chapter: "Canto 11, Chapter 5",
+                verse: "Verse 36"
+            },
+            {
+                sanskrit: "त्रिणादपि सुनीचेन तरोरपि सहिष्णुना ।\nअमानिना मानदेन कीर्तनीयः सदा हरिः ॥",
+                translation: "One should chant the holy name of the Lord in a humble state of mind, thinking oneself lower than the straw in the street; one should be more tolerant than a tree, devoid of all sense of false prestige, and should be ready to offer all respect to others. In such a state of mind one can chant the holy name of the Lord constantly.",
+                book: "Sri Siksastakam",
+                chapter: "Chaitanya Charitamrita",
+                verse: "Verse 3"
+            },
+            {
+                sanskrit: "चेतो दर्पण मार्जनं भव महादावाग्नि निर्वापणम् ।\nश्रेयः कैरव चन्द्रिका वितरणं विद्या वधू जीवनम् ॥",
+                translation: "The holy name of Krishna cleanses the mirror of the heart and stops the miseries of the blazing fire of material existence. It distributes the moonlight of transcendental knowledge and is the life and soul of all education.",
+                book: "Sri Siksastakam",
+                chapter: "Chaitanya Charitamrita",
+                verse: "Verse 1"
+            },
+            {
+                sanskrit: "उत्साहान्निश्चयाद्धैर्यात्तत्त्कर्मप्रवर्तनात् ।\nसङ्गत्यागात्सतो वृत्तेः षड्भिर्भक्तिः प्रसिद्ध्यति ॥",
+                translation: "The process of bhakti-yoga can be executed successfully with full enthusiasm, perseverance, and determination, by following the prescribed duties in the association of devotees and by engaging completely in activities of goodness.",
+                book: "Nectar of Instruction (Upadesamrta)",
+                chapter: "Rupa Goswami",
+                verse: "Verse 3"
+            },
+            {
+                sanskrit: "दादाति प्रतिगृह्णाति गुह्यमाख्याति पृच्छति ।\nभुङ्क्ते भोजयते चैव षड्विधं प्रीतिलक्षणम् ॥",
+                translation: "Offering gifts in charity, accepting charitable gifts, revealing one's mind in confidence, inquiring confidentially, accepting prasadam and offering prasadam are the six symptoms of love shared by one devotee and another.",
+                book: "Nectar of Instruction (Upadesamrta)",
+                chapter: "Rupa Goswami",
+                verse: "Verse 4"
+            },
+            {
+                sanskrit: "पत्रं पुष्पं फलं तोयं यो मे भक्त्या प्रयच्छति ।\nतदहं भक्त्युपहृतमश्नामि प्रयतात्मनः ॥",
+                translation: "If one offers Me with love and devotion a leaf, a flower, fruit or water, I will accept it.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 9",
+                verse: "Verse 26"
+            },
+            {
+                sanskrit: "मन्मना भव मद्भक्तो मद्याजी मां नमस्कुरु ।\nमामेवैष्यसि युक्त्वैवमात्मानं मत्परायणः ॥",
+                translation: "Engage your mind always in thinking of Me, become My devotee, offer obeisances to Me and worship Me. Being completely absorbed in Me, surely you will come to Me.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 9",
+                verse: "Verse 34"
+            },
+            {
+                sanskrit: "योगिनामपि सर्वेषां मद्गतेनान्तरात्मना ।\nश्रद्धावान्भजते यो मां स मे युक्ततमो मतः ॥",
+                translation: "Of all yogis, the one with great faith who always abides in Me, thinks of Me within himself, and renders transcendental loving service to Me—he is the most intimately united with Me in yoga and is the highest of all. That is My opinion.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 6",
+                verse: "Verse 47"
+            },
+            {
+                sanskrit: "समो दमस्तपः शौचं क्षान्तिरार्जवमेव च ।\nज्ञानं विज्ञानमास्तिक्यं ब्रह्मकर्म स्वभावजम् ॥",
+                translation: "Peacefulness, self-control, austerity, purity, tolerance, honesty, knowledge, wisdom and religiousness—these are the natural qualities by which the brahmanas work.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 18",
+                verse: "Verse 42"
+            },
+            {
+                sanskrit: "अद्वेष्टा सर्वभूतानां मैत्रः करुण एव च ।\nनिर्ममो निरहङ्कारः समदुःखसुखः क्षमी ॥",
+                translation: "One who is not envious but is a kind friend to all living entities, who does not think himself a proprietor and is free from false ego, who is equal in both happiness and distress, who is tolerant, always satisfied, self-controlled, and engaged in devotional service with determination, his mind and intelligence fixed on Me—such a devotee of Mine is very dear to Me.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 12",
+                verse: "Verse 13-14"
+            },
+            {
+                sanskrit: "यदा यदा हि धर्मस्य ग्लानिर्भवति भारत ।\nअभ्युत्थानमधर्मस्य तदात्मानं सृजाम्यहम् ॥",
+                translation: "Whenever and wherever there is a decline in religious practice, O descendant of Bharata, and a predominant rise of irreligion—at that time I descend Myself.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 4",
+                verse: "Verse 7"
+            },
+            {
+                sanskrit: "मां च योऽव्यभिचारेण भक्तियोगेन सेवते ।\nस गुणान्समतीत्यैतान्ब्रह्मभूयाय कल्पते ॥",
+                translation: "One who engages in full devotional service, unfailing in all circumstances, at once transcends the modes of material nature and thus comes to the level of Brahman.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 14",
+                verse: "Verse 26"
+            },
+            {
+                sanskrit: "ब्रह्मभूतः प्रसन्नात्मा न शोचति न काङ्क्षति ।\nसमः सर्वेषु भूतेषु मद्भक्तिं लभते पराम् ॥",
+                translation: "One who is thus transcendentally situated at once realizes the Supreme Brahman and becomes fully joyful. He never laments or desires to have anything. He is equally disposed toward every living entity. In that state he attains pure devotional service unto Me.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 18",
+                verse: "Verse 54"
+            },
+            {
+                sanskrit: "मय्यासक्तमनाः पार्थ योगं युञ्जन्मदाश्रयः ।\nअसंशयं समग्रं मां यथा ज्ञास्यसि तच्छृणु ॥",
+                translation: "Now hear, O son of Prtha, how by practicing yoga in full consciousness of Me, with mind attached to Me, you can know Me in full, free from doubt.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 7",
+                verse: "Verse 1"
+            },
+            {
+                sanskrit: "अहं हि सर्वयज्ञानां भोक्ता च प्रभुरेव च ।\nन तु मामभिजानन्ति तत्त्वेनातश्च्यवन्ति ते ॥",
+                translation: "I am the only enjoyer and master of all sacrifices. Therefore, those who do not recognize My true transcendental nature fall down.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 9",
+                verse: "Verse 24"
+            },
+            {
+                sanskrit: "अनिष्टमिष्टं मिश्रं च त्रिविधं कर्मणः फलम् ।\nभवत्यत्यागिनां प्रेत्य न तु सन्न्यासिनां क्वचित् ॥",
+                translation: "For one who is not renounced, the threefold fruits of action—desirable, undesirable and mixed—accrue after death. But those who are in the renounced order of life have no such result to suffer or enjoy.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 18",
+                verse: "Verse 12"
+            },
+            {
+                sanskrit: "श्रद्धावाँल्लभते ज्ञानं तत्परः संयतेन्द्रियः ।\nज्ञानं लब्ध्वा परां शान्तिमचिरेणाधिगच्छति ॥",
+                translation: "A faithful man who is dedicated to transcendental knowledge and who subdues his senses is eligible to achieve such knowledge, and having achieved it he quickly attains the supreme spiritual peace.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 4",
+                verse: "Verse 39"
+            },
+            {
+                sanskrit: "नास्तो विद्यते भावो नाभावो विद्यते सतः ।\nउभयोरपि दृष्टोऽन्तस्त्वनयोस्तत्त्वदर्शिभिः ॥",
+                translation: "Those who are seers of the truth have concluded that of the nonexistent [the material body] there is no endurance and of the eternal [the soul] there is no change. This they have concluded by studying the nature of both.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 2",
+                verse: "Verse 16"
+            },
+            {
+                sanskrit: "तस्मात्सर्वेषु कालेषु मामनुस्मर युध्य च ।\nमय्यर्पितमनोबुद्धिर्मामेवैष्यस्यसंशयः ॥",
+                translation: "Therefore, Arjuna, you should always think of Me in the form of Krishna and at the same time carry out your prescribed duty of fighting. With your activities dedicated to Me and your mind and intelligence fixed on Me, you will attain Me without doubt.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 8",
+                verse: "Verse 7"
+            },
+            {
+                sanskrit: "तस्माद्यस्य महाबाहो निगृहीतानि सर्वशः ।\nइन्द्रियाणीन्द्रियार्थेभ्यस्तस्य प्रज्ञा प्रतिष्ठिता ॥",
+                translation: "Therefore, O mighty-armed, one who has restrained the senses from their objects is firmly fixed in perfect consciousness.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 2",
+                verse: "Verse 68"
+            },
+            {
+                sanskrit: "यं यं वापि स्मरन्भावं त्यजत्यन्ते कलेवरम् ।\nतं तमेवैति कौन्तेय सदा तद्भावभावितः ॥",
+                translation: "Whatever state of being one remembers when he quits his body, O son of Kunti, that state he will attain without fail.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 8",
+                verse: "Verse 6"
+            },
+            {
+                sanskrit: "नियतं कुरु कर्म त्वं कर्म ज्यायो ह्यकर्मणः ।\nशरीरयात्रापि च ते न प्रसिद्ध्येदकर्मणः ॥",
+                translation: "Perform your prescribed duty, for doing so is better than not working. One cannot even maintain one's physical body without work.",
+                book: "Bhagavad Gita",
+                chapter: "Chapter 3",
+                verse: "Verse 8"
+            }
+        ];
+
+        let currentIndex = 0;
+        let timeRemaining = 600; // 10 minutes in seconds
+        let timerInterval;
+
+        function displaySloka(index) {
+            const sloka = slokas[index];
+            const container = document.getElementById('slokaContainer');
+
+            container.style.animation = 'none';
+            setTimeout(() => {
+                container.innerHTML = `
+                    <div class="sloka-sanskrit">${sloka.sanskrit}</div>
+                    <div class="sloka-translation">${sloka.translation}</div>
+                    <div class="reference">
+                        <span class="book">📖 ${sloka.book}</span>
+                        <span class="chapter-verse">${sloka.chapter}, ${sloka.verse}</span>
+                    </div>
+                `;
+                container.style.animation = 'fadeIn 1s ease-in';
+            }, 50);
+
+            document.getElementById('currentSloka').textContent = index + 1;
+            document.getElementById('totalSlokas').textContent = slokas.length;
+
+            // Reset timer
+            timeRemaining = 600;
+        }
+
+        function nextSloka() {
+            currentIndex = (currentIndex + 1) % slokas.length;
+            displaySloka(currentIndex);
+        }
+
+        function previousSloka() {
+            currentIndex = (currentIndex - 1 + slokas.length) % slokas.length;
+            displaySloka(currentIndex);
+        }
+
+        function updateTimer() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            document.getElementById('timer').textContent =
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            timeRemaining--;
+
+            if (timeRemaining < 0) {
+                nextSloka();
+            }
+        }
+
+        // Initialize
+        displaySloka(currentIndex);
+        timerInterval = setInterval(updateTimer, 1000);
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                nextSloka();
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                previousSloka();
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -5,46 +5,32 @@
 }
 
 :root {
-    --primary-color: #0A84FF;
-    --secondary-color: #98989D;
-    --success-color: #32D74B;
-    --danger-color: #FF453A;
-    --warning-color: #FF9F0A;
-    --light-gray: #2C2C2E;
-    --medium-gray: #3A3A3C;
-    --dark-gray: #1C1C1E;
-    --text-primary: #F5F5F7;
-    --text-secondary: #98989D;
+    --primary-color: #7a8f6a;
+    --secondary-color: #8E8E93;
+    --success-color: #6b8059;
+    --danger-color: #c85a4a;
+    --warning-color: #d8a65a;
+    --light-gray: #3a3a3c;
+    --medium-gray: #2c2c2e;
+    --dark-gray: #1c1c1e;
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.7);
     --border-radius: 12px;
-    --glass-bg: rgba(20, 20, 20, 0.4);
-    --glass-border: rgba(255, 255, 255, 0.15);
-    --box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --glass-bg: rgba(28, 28, 30, 0.85);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
     --transition: all 0.3s ease;
 }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #1a1a2e 100%);
-    background-size: 400% 400%;
-    animation: gradientShift 15s ease infinite;
+    background: linear-gradient(180deg, #1c1c1e 0%, #2c2c2e 70%, #4a5238 100%);
     min-height: 100vh;
     padding: 16px;
     line-height: 1.5;
     color: var(--text-primary);
-}
-
-@keyframes gradientShift {
-    0% {
-        background-position: 0% 50%;
-    }
-
-    50% {
-        background-position: 100% 50%;
-    }
-
-    100% {
-        background-position: 0% 50%;
-    }
+    position: relative;
+    z-index: 0;
 }
 
 /* Background Sloka */
