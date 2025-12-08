@@ -3,13 +3,15 @@ import clientPromise from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 
 // PUT /api/todos/[id] - Update todo (toggle complete)
-export async function PUT(request, { params }) {
+export async function PUT(request, context) {
     try {
+        const params = await context.params
         const { id } = params
         const body = await request.json()
 
-        if (!ObjectId.isValid(id)) {
-            return NextResponse.json({ error: 'Invalid todo ID' }, { status: 400 })
+        // Validate ObjectId format (24 character hex string)
+        if (!id || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
+            return NextResponse.json({ error: 'Invalid todo ID format' }, { status: 400 })
         }
 
         const client = await clientPromise
@@ -32,12 +34,14 @@ export async function PUT(request, { params }) {
 }
 
 // DELETE /api/todos/[id] - Delete todo
-export async function DELETE(request, { params }) {
+export async function DELETE(request, context) {
     try {
+        const params = await context.params
         const { id } = params
 
-        if (!ObjectId.isValid(id)) {
-            return NextResponse.json({ error: 'Invalid todo ID' }, { status: 400 })
+        // Validate ObjectId format (24 character hex string)
+        if (!id || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
+            return NextResponse.json({ error: 'Invalid todo ID format' }, { status: 400 })
         }
 
         const client = await clientPromise
