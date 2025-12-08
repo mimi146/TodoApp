@@ -891,3 +891,25 @@ header h1 {
 .logout-btn:hover {
     background: rgba(244, 67, 54, 0.3);
 }
+
+/* Admin Styles */
+.admin-badge {
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.todo-user-badge {
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: rgba(107, 124, 79, 0.2);
+    color: var(--primary-color);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}

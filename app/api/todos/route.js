@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import clientPromise from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { getSession } from '@/lib/auth/session'
+import { isAdmin } from '@/lib/auth/admin'
 
-// GET /api/todos - Fetch all todos for authenticated user
+// GET /api/todos - Fetch all todos for authenticated user (or all if admin)
 export async function GET() {
     try {
         const userId = await getSession()
@@ -13,13 +14,58 @@ export async function GET() {
 
         const client = await clientPromise
         const db = client.db('todoapp')
-        const todos = await db
-            .collection('todos')
-            .find({ userId })
-            .sort({ createdAt: -1 })
-            .toArray()
 
-        return NextResponse.json({ todos })
+        // Get current user to check admin status
+        const user = await db.collection('users').findOne({ _id: new ObjectId(userId) })
+        const userIsAdmin = isAdmin(user?.email)
+
+        if (userIsAdmin) {
+            // Admin: fetch all todos with user information
+            const todos = await db
+                .collection('todos')
+                .aggregate([
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'userId',
+                            foreignField: '_id',
+                            as: 'userInfo'
+                        }
+                    },
+                    {
+                        $unwind: {
+                            path: '$userInfo',
+                            preserveNullAndEmptyArrays: true
+                        }
+                    },
+                    {
+                        $addFields: {
+                            userName: '$userInfo.name',
+                            userEmail: '$userInfo.email'
+                        }
+                    },
+                    {
+                        $project: {
+                            userInfo: 0
+                        }
+                    },
+                    {
+                        $sort: { createdAt: -1 }
+                    }
+                ])
+                .toArray()
+
+            return NextResponse.json({ todos, isAdmin: true })
+        } else {
+            // Regular user: fetch only their todos
+            const todos = await db
+                .collection('todos')
+                .find({ userId })
+                .sort({ createdAt: -1 })
+                .toArray()
+
+            return NextResponse.json({ todos, isAdmin: false })
+        }
     } catch (error) {
         console.error('Error fetching todos:', error)
         return NextResponse.json({ error: 'Failed to fetch todos' }, { status: 500 })

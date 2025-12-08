@@ -14,6 +14,7 @@ export default function TodoApp() {
     const [pomodoroMinutes, setPomodoroMinutes] = useState(25)
     const [currentSlokaIndex, setCurrentSlokaIndex] = useState(0)
     const [loading, setLoading] = useState(true)
+    const [isAdmin, setIsAdmin] = useState(false)
 
     // Refs for timer
     const timerInterval = useRef(null)
@@ -44,6 +45,7 @@ export default function TodoApp() {
             const data = await res.json()
             if (data.todos) {
                 setTodos(data.todos)
+                setIsAdmin(data.isAdmin || false)
             }
         } catch (error) {
             console.error('Error fetching todos:', error)
@@ -448,6 +450,11 @@ export default function TodoApp() {
                                         style={{ cursor: 'pointer' }}
                                     >
                                         {todo.text}
+                                        {isAdmin && todo.userName && (
+                                            <span className="todo-user-badge">
+                                                👤 {todo.userName}
+                                            </span>
+                                        )}
                                     </span>
                                     <span className={`priority-badge ${todo.priority}`}>
                                         {todo.priority}

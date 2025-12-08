@@ -59,7 +59,10 @@ export default function AuthenticatedApp() {
     return (
         <div>
             <div className="user-header">
-                <span className="user-info">👤 {user.name || user.email}</span>
+                <span className="user-info">
+                    👤 {user.name || user.email}
+                    {user.isAdmin && <span className="admin-badge">ADMIN</span>}
+                </span>
                 <button onClick={handleLogout} className="logout-btn">
                     Logout
                 </button>

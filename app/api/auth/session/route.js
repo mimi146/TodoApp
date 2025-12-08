@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import clientPromise from '@/lib/mongodb'
 import { getSession } from '@/lib/auth/session'
+import { isAdmin } from '@/lib/auth/admin'
 import { ObjectId } from 'mongodb'
 
 export async function GET() {
@@ -26,7 +27,8 @@ export async function GET() {
             user: {
                 id: user._id,
                 email: user.email,
-                name: user.name
+                name: user.name,
+                isAdmin: isAdmin(user.email)
             }
         })
     } catch (error) {
