@@ -194,6 +194,9 @@ class TodoApp {
         this.startBtn.disabled = true;
         this.pauseBtn.disabled = false;
 
+        // Play start beep
+        this.playStartBeep();
+
         this.timerInterval = setInterval(() => {
             this.timeRemaining--;
             this.saveTimerState();
@@ -264,7 +267,7 @@ class TodoApp {
     }
 
     playBeep() {
-        // Create a simple beep sound using Web Audio API
+        // Create a completion beep sound (lower pitch, longer)
         try {
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = audioContext.createOscillator();
@@ -273,16 +276,39 @@ class TodoApp {
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
 
-            oscillator.frequency.value = 800;
+            oscillator.frequency.value = 600; // Lower pitch for completion
             oscillator.type = 'sine';
 
             gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
 
             oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.5);
+            oscillator.stop(audioContext.currentTime + 0.8);
         } catch (err) {
             console.log('Could not create beep sound:', err);
+        }
+    }
+
+    playStartBeep() {
+        // Create a start beep sound (higher pitch, shorter)
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = 1000; // Higher pitch for start
+            oscillator.type = 'sine';
+
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        } catch (err) {
+            console.log('Could not create start beep sound:', err);
         }
     }
 

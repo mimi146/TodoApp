@@ -24,11 +24,57 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #2d2d2d 100%);
+    background: linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #1a1a2e 100%);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
     min-height: 100vh;
     padding: 16px;
     line-height: 1.5;
     color: var(--text-primary);
+}
+
+@keyframes gradientShift {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* Background Sloka */
+.background-sloka {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.08);
+    text-align: center;
+    max-width: 80%;
+    line-height: 1.8;
+    pointer-events: none;
+    z-index: 0;
+    font-style: italic;
+    font-family: 'Georgia', serif;
+    animation: slokaFade 2s ease-in-out;
+}
+
+@keyframes slokaFade {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.95);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
 }
 
 .container {
@@ -39,8 +85,15 @@ body {
     -webkit-backdrop-filter: blur(30px) saturate(180%);
     border-radius: 20px;
     padding: 16px;
-    box-shadow: var(--box-shadow);
+    box-shadow: var(--box-shadow), 0 0 60px rgba(10, 132, 255, 0.1);
     border: 1px solid var(--glass-border);
+    transition: var(--transition);
+    position: relative;
+    z-index: 1;
+}
+
+.container:hover {
+    box-shadow: var(--box-shadow), 0 0 80px rgba(10, 132, 255, 0.15);
 }
 
 /* Header */
@@ -56,6 +109,10 @@ header h1 {
     color: var(--text-primary);
     margin-bottom: 2px;
     font-weight: 700;
+    background: linear-gradient(135deg, #F5F5F7 0%, #0A84FF 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .subtitle {
@@ -74,6 +131,12 @@ header h1 {
     margin-bottom: 16px;
     text-align: center;
     border: 1px solid var(--glass-border);
+    box-shadow: inset 0 0 40px rgba(10, 132, 255, 0.05);
+    transition: var(--transition);
+}
+
+.pomodoro-section:hover {
+    box-shadow: inset 0 0 50px rgba(10, 132, 255, 0.08), 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .timer-display {
@@ -113,6 +176,8 @@ header h1 {
     font-weight: 700;
     color: var(--primary-color);
     margin-bottom: 0;
+    text-shadow: 0 0 20px rgba(10, 132, 255, 0.5);
+    transition: var(--transition);
 }
 
 .timer-label {
@@ -170,7 +235,7 @@ header h1 {
 
 .btn:hover {
     transform: translateY(-2px);
-    box-shadow: var(--box-shadow);
+    box-shadow: 0 4px 12px rgba(10, 132, 255, 0.3);
 }
 
 .btn:active {
@@ -178,12 +243,14 @@ header h1 {
 }
 
 .btn-primary {
-    background: var(--primary-color);
+    background: linear-gradient(135deg, var(--primary-color) 0%, #0066CC 100%);
     color: white;
+    box-shadow: 0 4px 12px rgba(10, 132, 255, 0.3);
 }
 
 .btn-primary:hover {
-    background: #357abd;
+    background: linear-gradient(135deg, #0066CC 0%, var(--primary-color) 100%);
+    box-shadow: 0 6px 20px rgba(10, 132, 255, 0.4);
 }
 
 .btn-secondary {
@@ -213,13 +280,15 @@ header h1 {
 }
 
 .btn-add {
-    background: var(--success-color);
+    background: linear-gradient(135deg, var(--success-color) 0%, #28A745 100%);
     color: white;
     white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(50, 215, 75, 0.3);
 }
 
 .btn-add:hover {
-    background: #4cae4c;
+    background: linear-gradient(135deg, #28A745 0%, var(--success-color) 100%);
+    box-shadow: 0 6px 20px rgba(50, 215, 75, 0.4);
 }
 
 .btn-link {
@@ -317,12 +386,15 @@ header h1 {
 .filter-btn:hover {
     border-color: var(--primary-color);
     color: var(--primary-color);
+    background: rgba(10, 132, 255, 0.1);
+    box-shadow: 0 0 15px rgba(10, 132, 255, 0.2);
 }
 
 .filter-btn.active {
-    background: var(--primary-color);
+    background: linear-gradient(135deg, var(--primary-color) 0%, #0066CC 100%);
     color: var(--text-primary);
     border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(10, 132, 255, 0.3);
 }
 
 /* Todo List */
@@ -349,7 +421,8 @@ header h1 {
 .todo-item:hover {
     background: rgba(35, 35, 35, 0.6);
     transform: translateX(4px) scale(1.01);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(10, 132, 255, 0.1);
+    border-color: rgba(10, 132, 255, 0.3);
 }
 
 .todo-item.completed {
@@ -394,25 +467,33 @@ header h1 {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    transition: var(--transition);
+}
+
+.priority-badge:hover {
+    transform: scale(1.05);
 }
 
 .priority-badge.high {
-    background: #ffebee;
-    color: var(--danger-color);
+    background: linear-gradient(135deg, #FF453A 0%, #DC143C 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(255, 69, 58, 0.4);
 }
 
 .priority-badge.medium {
-    background: #fff3e0;
-    color: #e65100;
+    background: linear-gradient(135deg, #FF9F0A 0%, #FF8C00 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(255, 159, 10, 0.4);
 }
 
 .priority-badge.low {
-    background: #e8f5e9;
-    color: #2e7d32;
+    background: linear-gradient(135deg, #32D74B 0%, #28A745 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(50, 215, 75, 0.4);
 }
 
 .delete-btn {
-    background: var(--danger-color);
+    background: linear-gradient(135deg, var(--danger-color) 0%, #DC143C 100%);
     color: white;
     border: none;
     padding: 6px 12px;
@@ -421,11 +502,13 @@ header h1 {
     font-size: 0.875rem;
     font-weight: 500;
     transition: var(--transition);
+    box-shadow: 0 2px 8px rgba(255, 69, 58, 0.3);
 }
 
 .delete-btn:hover {
-    background: #c9302c;
+    background: linear-gradient(135deg, #DC143C 0%, var(--danger-color) 100%);
     transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(255, 69, 58, 0.5);
 }
 
 /* Todo Stats */
