@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo App with Pomodoro Timer</title>
+    <meta name="description" content="Classic todo app with integrated Pomodoro timer and task priorities">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 Todo & Pomodoro</h1>
+            <p class="subtitle">Stay focused and productive</p>
+        </header>
+
+        <!-- Pomodoro Timer Section -->
+        <section class="pomodoro-section">
+            <div class="timer-display">
+                <div class="timer-circle">
+                    <svg class="progress-ring" width="140" height="140">
+                        <circle class="progress-ring-circle" stroke="#e0e0e0" stroke-width="6" fill="transparent" r="64"
+                            cx="70" cy="70" />
+                        <circle class="progress-ring-circle-active" stroke="#0A84FF" stroke-width="6" fill="transparent"
+                            r="64" cx="70" cy="70" />
+                    </svg>
+                    <div class="timer-text">
+                        <span id="timer">25:00</span>
+                        <span class="timer-label">Focus Time</span>
+                    </div>
+                </div>
+            </div>
+            <div class="timer-controls">
+                <button id="startBtn" class="btn btn-primary">Start</button>
+                <button id="pauseBtn" class="btn btn-secondary" disabled>Pause</button>
+                <button id="resetBtn" class="btn btn-tertiary">Reset</button>
+            </div>
+            <div class="timer-settings">
+                <label for="pomodoroMinutes">Minutes:</label>
+                <input type="number" id="pomodoroMinutes" min="1" max="60" value="25">
+            </div>
+        </section>
+
+        <!-- Todo List Section -->
+        <section class="todo-section">
+            <h2>Tasks</h2>
+            <form id="todoForm" class="todo-form">
+                <input type="text" id="todoInput" placeholder="What needs to be done?" required>
+                <select id="prioritySelect" class="priority-select">
+                    <option value="low">Low Priority</option>
+                    <option value="medium" selected>Medium Priority</option>
+                    <option value="high">High Priority</option>
+                </select>
+                <button type="submit" class="btn btn-add">Add Task</button>
+            </form>
+
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="active">Active</button>
+                <button class="filter-btn" data-filter="completed">Completed</button>
+            </div>
+
+            <ul id="todoList" class="todo-list"></ul>
+
+            <div class="todo-stats">
+                <span id="todoCount">0 tasks remaining</span>
+                <button id="clearCompleted" class="btn-link">Clear completed</button>
+            </div>
+        </section>
+    </div>
+
+    <audio id="pomodoroSound" preload="auto">
+        <source src="notification.mp3" type="audio/mpeg">
+    </audio>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
