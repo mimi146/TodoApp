@@ -24,10 +24,15 @@ export async function GET() {
         // Fetch users with their todo counts using aggregation
         const users = await db.collection('users').aggregate([
             {
+                $addFields: {
+                    userIdString: { $toString: '$_id' }
+                }
+            },
+            {
                 $lookup: {
                     from: 'todos',
-                    localField: '_id',
-                    foreignField: 'userId', // Make sure this matches how you store references (ObjectId or String)
+                    localField: 'userIdString',
+                    foreignField: 'userId',
                     as: 'userTodos'
                 }
             },
@@ -40,7 +45,8 @@ export async function GET() {
                 $project: {
                     password: 0,
                     recoveryCode: 0,
-                    userTodos: 0 // Don't send all todos in the list view, just the count
+                    userTodos: 0,
+                    userIdString: 0
                 }
             },
             {
