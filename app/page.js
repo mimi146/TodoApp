@@ -1,5 +1,5 @@
-import TodoApp from '@/components/TodoApp'
+import AuthenticatedApp from '@/components/AuthenticatedApp'
 
 export default function Home() {
-    return <TodoApp />
+    return <AuthenticatedApp />
 }

@@ -1,15 +1,21 @@
 import { NextResponse } from 'next/server'
 import clientPromise from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
+import { getSession } from '@/lib/auth/session'
 
-// GET /api/todos - Fetch all todos
+// GET /api/todos - Fetch all todos for authenticated user
 export async function GET() {
     try {
+        const userId = await getSession()
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const client = await clientPromise
         const db = client.db('todoapp')
         const todos = await db
             .collection('todos')
-            .find({})
+            .find({ userId })
             .sort({ createdAt: -1 })
             .toArray()
 
@@ -20,9 +26,14 @@ export async function GET() {
     }
 }
 
-// POST /api/todos - Create new todo
+// POST /api/todos - Create new todo for authenticated user
 export async function POST(request) {
     try {
+        const userId = await getSession()
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const body = await request.json()
         const { text, priority } = body
 
@@ -34,6 +45,7 @@ export async function POST(request) {
         const db = client.db('todoapp')
 
         const newTodo = {
+            userId,
             text,
             priority: priority || 'medium',
             completed: false,

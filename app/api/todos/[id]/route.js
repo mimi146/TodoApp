@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server'
 import clientPromise from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
+import { getSession } from '@/lib/auth/session'
 
 // PUT /api/todos/[id] - Update todo (toggle complete)
 export async function PUT(request, context) {
     try {
+        const userId = await getSession()
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const params = await context.params
         const { id } = params
         const body = await request.json()
@@ -17,8 +23,9 @@ export async function PUT(request, context) {
         const client = await clientPromise
         const db = client.db('todoapp')
 
+        // Update only if todo belongs to user
         const result = await db.collection('todos').updateOne(
-            { _id: new ObjectId(id) },
+            { _id: new ObjectId(id), userId },
             { $set: { completed: body.completed } }
         )
 
@@ -36,6 +43,11 @@ export async function PUT(request, context) {
 // DELETE /api/todos/[id] - Delete todo
 export async function DELETE(request, context) {
     try {
+        const userId = await getSession()
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const params = await context.params
         const { id } = params
 
@@ -47,8 +59,10 @@ export async function DELETE(request, context) {
         const client = await clientPromise
         const db = client.db('todoapp')
 
+        // Delete only if todo belongs to user
         const result = await db.collection('todos').deleteOne({
-            _id: new ObjectId(id)
+            _id: new ObjectId(id),
+            userId
         })
 
         if (result.deletedCount === 0) {
