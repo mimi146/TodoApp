@@ -108,7 +108,7 @@ export default function TodoApp() {
     useEffect(() => {
         const interval = setInterval(() => {
             setCurrentSlokaIndex(prev => (prev + 1) % slokas.length)
-        }, 600000) // 10 minutes
+        }, 300000) // 5 minutes
 
         return () => clearInterval(interval)
     }, [])
