@@ -552,25 +552,195 @@ header h1 {
     animation: fadeIn 0.3s ease;
 }
 
+
 /* Responsive Design */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+    body {
+        padding: 12px;
+    }
+
     .container {
-        padding: 24px;
+        padding: 16px;
+        max-width: 100%;
     }
 
     header h1 {
-        font-size: 2rem;
+        font-size: 1.25rem;
     }
 
-    .todo-form {
-        flex-direction: column;
+    .subtitle {
+        font-size: 0.8rem;
+    }
+
+    /* Timer Section */
+    .timer-display {
+        margin-bottom: 12px;
+    }
+
+    .timer-ring {
+        width: 100px;
+        height: 100px;
+    }
+
+    #timer {
+        font-size: 1.3rem;
+    }
+
+    .timer-label {
+        font-size: 0.55rem;
     }
 
     .timer-controls {
         flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .btn {
+        padding: 10px 16px;
+        font-size: 0.85rem;
+        min-width: 80px;
+        /* Better touch targets */
+        min-height: 44px;
+    }
+
+    .timer-settings {
+        font-size: 0.8rem;
+    }
+
+    .timer-settings input {
+        width: 55px;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+
+    /* Todo Section */
+    .todo-form {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .todo-form input {
+        width: 100%;
+        padding: 12px;
+        font-size: 1rem;
+    }
+
+    .todo-form select {
+        width: 100%;
+        padding: 12px;
+        font-size: 1rem;
+    }
+
+    .btn-add {
+        width: 100%;
+        padding: 12px;
+    }
+
+    .filter-buttons {
+        gap: 6px;
+    }
+
+    .filter-btn {
+        flex: 1;
+        padding: 10px 12px;
+        font-size: 0.85rem;
+        /* Touch friendly */
+        min-height: 40px;
+    }
+
+    .todo-item {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .todo-checkbox {
+        width: 24px;
+        height: 24px;
+        /* Bigger touch target */
+    }
+
+    .todo-text {
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    .priority-badge {
+        padding: 4px 10px;
+        font-size: 0.7rem;
+    }
+
+    .delete-btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        min-height: 36px;
+    }
+
+    /* Sloka */
+    .background-sloka {
+        font-size: 0.7rem;
+        padding: 8px 12px;
+        max-width: 95%;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+    body {
+        padding: 8px;
+    }
+
+    .container {
+        padding: 12px;
+        border-radius: 16px;
+    }
+
+    header {
+        margin-bottom: 12px;
+        padding-bottom: 6px;
+    }
+
+    header h1 {
+        font-size: 1.1rem;
+    }
+
+    .pomodoro-section {
+        padding: 10px;
+        margin-bottom: 12px;
+    }
+
+    .timer-ring {
+        width: 90px;
+        height: 90px;
     }
 
     #timer {
-        font-size: 2.5rem;
+        font-size: 1.2rem;
+    }
+
+    .timer-label {
+        font-size: 0.5rem;
+    }
+
+    .btn {
+        padding: 8px 12px;
+        min-width: 70px;
+    }
+
+    .filter-btn {
+        padding: 8px 10px;
+        font-size: 0.8rem;
+    }
+
+    .todo-item {
+        padding: 10px;
+    }
+
+    .todo-text {
+        font-size: 0.9rem;
+    }
+
+    .background-sloka {
+        font-size: 0.65rem;
+        bottom: 10px;
     }
 }
