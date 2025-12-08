@@ -61,11 +61,23 @@ export default function AuthenticatedApp() {
             <div className="user-header">
                 <span className="user-info">
                     👤 {user.name || user.email}
-                    {user.isAdmin && <span className="admin-badge">ADMIN</span>}
+                    {user.isAdmin && (
+                        <>
+                            <span className="admin-badge">ADMIN</span>
+                            <a href="/admin/users" className="admin-link" style={{ marginLeft: '15px', color: 'var(--primary-color)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                                👥 Users List
+                            </a>
+                        </>
+                    )}
                 </span>
-                <button onClick={handleLogout} className="logout-btn">
-                    Logout
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <a href="/" style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: 'var(--text-primary)', textDecoration: 'none', fontSize: '0.9rem' }}>
+                        Home
+                    </a>
+                    <button onClick={handleLogout} className="logout-btn">
+                        Logout
+                    </button>
+                </div>
             </div>
             <TodoApp />
         </div>
