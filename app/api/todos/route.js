@@ -91,7 +91,7 @@ export async function POST(request) {
         const db = client.db('todoapp')
 
         const newTodo = {
-            userId,
+            userId: userId.toString(),
             text,
             priority: priority || 'medium',
             completed: false,
@@ -101,7 +101,7 @@ export async function POST(request) {
         const result = await db.collection('todos').insertOne(newTodo)
 
         return NextResponse.json({
-            todo: { ...newTodo, _id: result.insertedId }
+            todo: { ...newTodo, _id: result.insertedId.toString() }
         }, { status: 201 })
     } catch (error) {
         console.error('Error creating todo:', error)

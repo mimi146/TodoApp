@@ -25,7 +25,7 @@ export async function PUT(request, context) {
 
         // Update only if todo belongs to user
         const result = await db.collection('todos').updateOne(
-            { _id: new ObjectId(id), userId },
+            { _id: new ObjectId(id), userId: userId.toString() },
             { $set: { completed: body.completed } }
         )
 
@@ -62,7 +62,7 @@ export async function DELETE(request, context) {
         // Delete only if todo belongs to user
         const result = await db.collection('todos').deleteOne({
             _id: new ObjectId(id),
-            userId
+            userId: userId.toString()
         })
 
         if (result.deletedCount === 0) {
