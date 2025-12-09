@@ -266,21 +266,28 @@ export default function TodoApp() {
     // Status Badge Logic
     let statusBadge = null
     if (!isOnline) {
-        statusBadge = <span style={{ fontSize: '0.6em', background: '#ff4444', color: 'white', padding: '2px 8px', borderRadius: '10px', marginLeft: '10px', verticalAlign: 'middle', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>☁️ Offline</span>
+        statusBadge = (
+            <div className="status-badge" style={{ background: '#ff4444' }}>
+                <span>☁️</span> Offline
+            </div>
+        )
     } else if (syncStatus === 'syncing') {
-        statusBadge = <span style={{ fontSize: '0.6em', background: '#ffa726', color: 'white', padding: '2px 8px', borderRadius: '10px', marginLeft: '10px', verticalAlign: 'middle', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>🔄 Syncing...</span>
+        statusBadge = (
+            <div className="status-badge" style={{ background: '#ffa726' }}>
+                <span>🔄</span> Syncing...
+            </div>
+        )
     }
-    // We can also add 'Synced' tick but usually clean UI is better when everything is fine
 
     return (
         <>
             <div className="background-sloka">{slokas[currentSlokaIndex]}</div>
 
             <div className="container">
+                {statusBadge}
                 <header>
                     <h1>
                         📝 Todo & Pomodoro
-                        {statusBadge}
                     </h1>
                     <p className="subtitle">Stay focused and productive</p>
                 </header>

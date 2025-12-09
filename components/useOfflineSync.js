@@ -171,8 +171,13 @@ export function useOfflineSync(initialTodos = []) {
             setQueue(prev => prev.filter(item => !processedUUIDs.has(item.uuid)))
 
             if (!failed) {
-                // Fetch only after successful sync, forcing bypass of queue check
-                await fetchLatestTodos(true)
+                // Fetch new data BEFORE setting status to synced to avoid UI flicker
+                // We pass true logic by manually calling the data fetcher
+                const newTodos = await fetchTodosData()
+
+                if (newTodos) {
+                    setTodos(newTodos)
+                }
                 setSyncStatus('synced')
             } else {
                 setSyncStatus('offline')
@@ -182,22 +187,27 @@ export function useOfflineSync(initialTodos = []) {
         }
     }
 
-    const fetchLatestTodos = async (force = false) => {
-        // CRITICAL: Do not fetch if we are offline OR if we have pending items in the queue.
-        // Fetching while queue is populated will overwrite our optimistic state with stale server data.
-        // However, if called from processQueue (force=true), we know we just emptied the relevant items.
-        if (!navigator.onLine || (!force && queueRef.current.length > 0)) return
-
+    // Helper to fetch data without setting state
+    const fetchTodosData = async () => {
         try {
             const res = await fetch('/api/todos')
             if (res.ok) {
                 const data = await res.json()
-                if (data.todos) {
-                    setTodos(data.todos)
-                }
+                return data.todos || []
             }
         } catch (error) {
             console.error('Failed to fetch latest todos:', error)
+        }
+        return null
+    }
+
+    // Public refresh function
+    const fetchLatestTodos = async (force = false) => {
+        if (!navigator.onLine || (!force && queueRef.current.length > 0)) return
+
+        const todosData = await fetchTodosData()
+        if (todosData) {
+            setTodos(todosData)
         }
     }
 
