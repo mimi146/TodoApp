@@ -32,13 +32,13 @@ export function useOfflineSync(initialTodos = []) {
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && navigator.onLine) {
-                fetchLatestTodos()
+                processQueue()
             }
         }
 
         const handleFocus = () => {
             if (navigator.onLine) {
-                fetchLatestTodos()
+                processQueue()
             }
         }
 
@@ -83,96 +83,110 @@ export function useOfflineSync(initialTodos = []) {
         return Date.now().toString(36) + Math.random().toString(36).substr(2)
     }
 
+    // Flag to prevent concurrent syncs
+    const isSyncingRef = useRef(false)
+
     // Process the Sync Queue
     const processQueue = async () => {
-        if (!navigator.onLine) return
+        if (!navigator.onLine || isSyncingRef.current) return
 
-        const currentQueue = JSON.parse(localStorage.getItem('offlineQueue') || '[]')
-        if (currentQueue.length === 0) {
-            await fetchLatestTodos()
-            setSyncStatus('synced')
-            return
-        }
-
+        isSyncingRef.current = true
         setSyncStatus('syncing')
-        let tempIdMap = {} // Maps tempId -> realId
-        let processedUUIDs = new Set()
-        let failed = false
 
-        // Process sequentially
-        for (const action of currentQueue) {
-            // Apply ID mapping from previous steps in this batch
-            let effectiveId = action.id
-            if (tempIdMap[effectiveId]) {
-                effectiveId = tempIdMap[effectiveId]
+        try {
+            const currentQueue = JSON.parse(localStorage.getItem('offlineQueue') || '[]')
+            if (currentQueue.length === 0) {
+                // Only fetch if queue is empty
+                await fetchLatestTodos()
+                setSyncStatus('synced')
+                return
             }
 
-            try {
-                let res
-                if (action.type === 'ADD') {
-                    res = await fetch('/api/todos', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(action.payload)
-                    })
+            let tempIdMap = {} // Maps tempId -> realId
+            let processedUUIDs = new Set()
+            let failed = false
 
-                    if (res && res.ok) {
-                        const data = await res.json()
-                        const realId = data.todo._id
-                        const tempId = action.id
-
-                        tempIdMap[tempId] = realId
-
-                        // Update local todos to replace temp ID with real ID immediately
-                        setTodos(prev => prev.map(t => t._id === tempId ? { ...t, _id: realId } : t))
-                    }
-                } else if (action.type === 'UPDATE') {
-                    res = await fetch(`/api/todos/${effectiveId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(action.payload)
-                    })
-                } else if (action.type === 'DELETE') {
-                    res = await fetch(`/api/todos/${effectiveId}`, {
-                        method: 'DELETE'
-                    })
+            // Process sequentially
+            for (const action of currentQueue) {
+                // Apply ID mapping from previous steps in this batch
+                let effectiveId = action.id
+                if (tempIdMap[effectiveId]) {
+                    effectiveId = tempIdMap[effectiveId]
                 }
 
-                if (res && !res.ok) {
-                    if (res.status >= 500) {
-                        failed = true
-                        break
+                try {
+                    let res
+                    if (action.type === 'ADD') {
+                        res = await fetch('/api/todos', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(action.payload)
+                        })
+
+                        if (res && res.ok) {
+                            const data = await res.json()
+                            const realId = data.todo._id
+                            const tempId = action.id
+
+                            tempIdMap[tempId] = realId
+
+                            // Update local todos to replace temp ID with real ID immediately
+                            setTodos(prev => prev.map(t => t._id === tempId ? { ...t, _id: realId } : t))
+                        }
+                    } else if (action.type === 'UPDATE') {
+                        res = await fetch(`/api/todos/${effectiveId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(action.payload)
+                        })
+                    } else if (action.type === 'DELETE') {
+                        res = await fetch(`/api/todos/${effectiveId}`, {
+                            method: 'DELETE'
+                        })
                     }
-                    // For 4xx errors, we usually consider them "processed" (e.g. invalid ID) to avoid infinite loops,
-                    // unless strictly temporary. Here we assume we can remove them.
-                    // But wait, if an UPDATE 404s because the ADD failed previously (network error), we shouldn't lose it.
-                    // But here we stop at network errors (catch block). 
-                    // 404 implies logic error or server data mismatch, which retrying won't fix.
+
+                    if (res && !res.ok) {
+                        if (res.status >= 500) {
+                            failed = true
+                            break
+                        }
+                        // For 4xx errors, we usually consider them "processed" (e.g. invalid ID) to avoid infinite loops,
+                        // unless strictly temporary. Here we assume we can remove them.
+                        // But wait, if an UPDATE 404s because the ADD failed previously (network error), we shouldn't lose it.
+                        // But here we stop at network errors (catch block).
+                        // 404 implies logic error or server data mismatch, which retrying won't fix.
+                    }
+
+                    // If we got here (ok or handled 4xx), mark as processed
+                    processedUUIDs.add(action.uuid)
+
+                } catch (error) {
+                    console.error('Sync failed for action:', action, error)
+                    failed = true
+                    break
                 }
-
-                // If we got here (ok or handled 4xx), mark as processed
-                processedUUIDs.add(action.uuid)
-
-            } catch (error) {
-                console.error('Sync failed for action:', action, error)
-                failed = true
-                break
             }
-        }
 
-        // Remove processed items from queue safely
-        setQueue(prev => prev.filter(item => !processedUUIDs.has(item.uuid)))
+            // Remove processed items from queue safely
+            setQueue(prev => prev.filter(item => !processedUUIDs.has(item.uuid)))
 
-        if (!failed) {
-            await fetchLatestTodos()
-            setSyncStatus('synced')
-        } else {
-            setSyncStatus('offline')
+            if (!failed) {
+                // Fetch only after successful sync
+                await fetchLatestTodos()
+                setSyncStatus('synced')
+            } else {
+                setSyncStatus('offline')
+            }
+        } finally {
+            isSyncingRef.current = false
         }
     }
 
     const fetchLatestTodos = async () => {
-        if (!navigator.onLine) return
+        // CRITICAL: Do not fetch if we are offline OR if we have pending items in the queue.
+        // Fetching while queue is populated will overwrite our optimistic state with stale server data.
+        if (!navigator.onLine || queueRef.current.length > 0) return
+
         try {
             const res = await fetch('/api/todos')
             if (res.ok) {
