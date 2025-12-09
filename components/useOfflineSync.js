@@ -171,8 +171,8 @@ export function useOfflineSync(initialTodos = []) {
             setQueue(prev => prev.filter(item => !processedUUIDs.has(item.uuid)))
 
             if (!failed) {
-                // Fetch only after successful sync
-                await fetchLatestTodos()
+                // Fetch only after successful sync, forcing bypass of queue check
+                await fetchLatestTodos(true)
                 setSyncStatus('synced')
             } else {
                 setSyncStatus('offline')
@@ -182,10 +182,11 @@ export function useOfflineSync(initialTodos = []) {
         }
     }
 
-    const fetchLatestTodos = async () => {
+    const fetchLatestTodos = async (force = false) => {
         // CRITICAL: Do not fetch if we are offline OR if we have pending items in the queue.
         // Fetching while queue is populated will overwrite our optimistic state with stale server data.
-        if (!navigator.onLine || queueRef.current.length > 0) return
+        // However, if called from processQueue (force=true), we know we just emptied the relevant items.
+        if (!navigator.onLine || (!force && queueRef.current.length > 0)) return
 
         try {
             const res = await fetch('/api/todos')

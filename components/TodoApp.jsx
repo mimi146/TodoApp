@@ -149,7 +149,9 @@ export default function TodoApp() {
             const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority]
             if (priorityDiff !== 0) return priorityDiff
             // Then by creation time (newer first)
-            return b.id - a.id
+            const dateA = new Date(a.createdAt || 0)
+            const dateB = new Date(b.createdAt || 0)
+            return dateB - dateA
         })
 
 
