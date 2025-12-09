@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     async headers() {
-        // Headers configuration removed to allow PWA caching
+        return []
     },
 }
 
