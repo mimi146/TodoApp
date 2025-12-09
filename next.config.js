@@ -14,6 +14,19 @@ const withPWA = withPWAInit({
     disable: process.env.NODE_ENV === 'development',
     workboxOptions: {
         disableDevLogs: true,
+        runtimeCaching: [
+            {
+                urlPattern: /^https?.+\/api\/.+$/,
+                handler: 'StaleWhileRevalidate',
+                options: {
+                    cacheName: 'api-cache',
+                    expiration: {
+                        maxEntries: 50,
+                        maxAgeSeconds: 24 * 60 * 60 // 24 hours
+                    }
+                }
+            }
+        ]
     },
 })
 
