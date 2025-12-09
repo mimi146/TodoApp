@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import clientPromise from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { getSession } from '@/lib/auth/session'
+import { isAdmin } from '@/lib/auth/admin'
 
 // PUT /api/todos/[id] - Update todo (toggle complete)
 export async function PUT(request, context) {
@@ -23,9 +24,19 @@ export async function PUT(request, context) {
         const client = await clientPromise
         const db = client.db('todoapp')
 
-        // Update only if todo belongs to user
+        // Check if user is admin
+        const user = await db.collection('user').findOne({ _id: new ObjectId(userId) })
+        const userIsAdmin = isAdmin(user?.email)
+
+        let query = { _id: new ObjectId(id) }
+
+        // If not admin, enforce ownership
+        if (!userIsAdmin) {
+            query.userId = userId.toString()
+        }
+
         const result = await db.collection('todos').updateOne(
-            { _id: new ObjectId(id), userId: userId.toString() },
+            query,
             { $set: { completed: body.completed } }
         )
 
@@ -59,11 +70,18 @@ export async function DELETE(request, context) {
         const client = await clientPromise
         const db = client.db('todoapp')
 
-        // Delete only if todo belongs to user
-        const result = await db.collection('todos').deleteOne({
-            _id: new ObjectId(id),
-            userId: userId.toString()
-        })
+        // Check if user is admin
+        const user = await db.collection('user').findOne({ _id: new ObjectId(userId) })
+        const userIsAdmin = isAdmin(user?.email)
+
+        let query = { _id: new ObjectId(id) }
+
+        // If not admin, enforce ownership
+        if (!userIsAdmin) {
+            query.userId = userId.toString()
+        }
+
+        const result = await db.collection('todos').deleteOne(query)
 
         if (result.deletedCount === 0) {
             return NextResponse.json({ error: 'Todo not found' }, { status: 404 })

@@ -25,9 +25,14 @@ export async function GET() {
                 .collection('todos')
                 .aggregate([
                     {
+                        $addFields: {
+                            userObjId: { $toObjectId: '$userId' }
+                        }
+                    },
+                    {
                         $lookup: {
                             from: 'user',
-                            localField: 'userId',
+                            localField: 'userObjId',
                             foreignField: '_id',
                             as: 'userInfo'
                         }
@@ -46,7 +51,8 @@ export async function GET() {
                     },
                     {
                         $project: {
-                            userInfo: 0
+                            userInfo: 0,
+                            userObjId: 0
                         }
                     },
                     {
