@@ -15,7 +15,7 @@ export async function POST(request) {
         const db = client.db('todoapp')
 
         // Find user
-        const user = await db.collection('users').findOne({ email: email.toLowerCase() })
+        const user = await db.collection('user').findOne({ email: email.toLowerCase() })
         if (!user) {
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
         }

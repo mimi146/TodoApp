@@ -14,7 +14,7 @@ export async function POST(request) {
         const db = client.db('todoapp')
 
         // Find user by email
-        const user = await db.collection('users').findOne({ email: email.toLowerCase() })
+        const user = await db.collection('user').findOne({ email: email.toLowerCase() })
 
         if (!user || !user.recoveryCode) {
             return NextResponse.json({ error: 'Invalid email or recovery code' }, { status: 400 })
@@ -31,7 +31,7 @@ export async function POST(request) {
         const hashedNewPassword = await bcrypt.hash(newPassword, 10)
 
         // Update password
-        await db.collection('users').updateOne(
+        await db.collection('user').updateOne(
             { _id: user._id },
             { $set: { password: hashedNewPassword } }
         )

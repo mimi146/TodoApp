@@ -14,7 +14,7 @@ export async function GET() {
         const client = await clientPromise
         const db = client.db('todoapp')
 
-        const user = await db.collection('users').findOne(
+        const user = await db.collection('user').findOne(
             { _id: new ObjectId(userId) },
             { projection: { password: 0 } }
         )

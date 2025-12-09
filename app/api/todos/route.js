@@ -16,7 +16,7 @@ export async function GET() {
         const db = client.db('todoapp')
 
         // Get current user to check admin status
-        const user = await db.collection('users').findOne({ _id: new ObjectId(userId) })
+        const user = await db.collection('user').findOne({ _id: new ObjectId(userId) })
         const userIsAdmin = isAdmin(user?.email)
 
         if (userIsAdmin) {
@@ -26,7 +26,7 @@ export async function GET() {
                 .aggregate([
                     {
                         $lookup: {
-                            from: 'users',
+                            from: 'user',
                             localField: 'userId',
                             foreignField: '_id',
                             as: 'userInfo'

@@ -15,7 +15,7 @@ export async function POST(request) {
         const db = client.db('todoapp')
 
         // Check if user exists
-        const existingUser = await db.collection('users').findOne({ email: email.toLowerCase() })
+        const existingUser = await db.collection('user').findOne({ email: email.toLowerCase() })
         if (existingUser) {
             return NextResponse.json({ error: 'Email already registered' }, { status: 400 })
         }
@@ -29,7 +29,7 @@ export async function POST(request) {
         const hashedRecoveryCode = await bcrypt.hash(recoveryCode, 10)
 
         // Create user
-        const result = await db.collection('users').insertOne({
+        const result = await db.collection('user').insertOne({
             email: email.toLowerCase(),
             password: hashedPassword,
             name,

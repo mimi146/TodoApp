@@ -16,13 +16,13 @@ export async function GET() {
         const db = client.db('todoapp')
 
         // Verify admin
-        const adminUser = await db.collection('users').findOne({ _id: new ObjectId(adminId) })
+        const adminUser = await db.collection('user').findOne({ _id: new ObjectId(adminId) })
         if (!isAdmin(adminUser?.email)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
         // Fetch users with their todo counts using aggregation
-        const users = await db.collection('users').aggregate([
+        const users = await db.collection('user').aggregate([
             {
                 $addFields: {
                     userIdString: { $toString: '$_id' }
