@@ -30,12 +30,28 @@ export function useOfflineSync(initialTodos = []) {
             setSyncStatus('offline')
         }
 
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && navigator.onLine) {
+                fetchLatestTodos()
+            }
+        }
+
+        const handleFocus = () => {
+            if (navigator.onLine) {
+                fetchLatestTodos()
+            }
+        }
+
         window.addEventListener('online', handleOnline)
         window.addEventListener('offline', handleOffline)
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        window.addEventListener('focus', handleFocus)
 
         return () => {
             window.removeEventListener('online', handleOnline)
             window.removeEventListener('offline', handleOffline)
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+            window.removeEventListener('focus', handleFocus)
         }
     }, [])
 
