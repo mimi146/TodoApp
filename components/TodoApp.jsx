@@ -1,10 +1,20 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useOfflineSync } from './useOfflineSync'
 
 export default function TodoApp() {
     // State management
-    const [todos, setTodos] = useState([])
+    const {
+        todos,
+        isOnline,
+        syncStatus,
+        addTodo: hookAddTodo,
+        toggleTodo: hookToggleTodo,
+        deleteTodo: hookDeleteTodo,
+        refresh
+    } = useOfflineSync([])
+
     const [todoInput, setTodoInput] = useState('')
     const [todoPriority, setTodoPriority] = useState('medium')
     const [currentFilter, setCurrentFilter] = useState('all')
@@ -13,8 +23,8 @@ export default function TodoApp() {
     const [isRunning, setIsRunning] = useState(false)
     const [pomodoroMinutes, setPomodoroMinutes] = useState(25)
     const [currentSlokaIndex, setCurrentSlokaIndex] = useState(0)
-    const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [loading, setLoading] = useState(false)
 
     // Refs for timer
     const timerInterval = useRef(null)
@@ -33,26 +43,10 @@ export default function TodoApp() {
         "प्रज्ञावादांश्च भाषसे।\nगतासूनगतासूंश्च नानुशोचन्ति पण्डिताः॥\n\n(The wise grieve neither for the living nor for the dead.)"
     ]
 
-    // Load todos from MongoDB
+    // Initial load
     useEffect(() => {
-        fetchTodos()
+        refresh()
     }, [])
-
-    const fetchTodos = async () => {
-        try {
-            setLoading(true)
-            const res = await fetch('/api/todos')
-            const data = await res.json()
-            if (data.todos) {
-                setTodos(data.todos)
-                setIsAdmin(data.isAdmin || false)
-            }
-        } catch (error) {
-            console.error('Error fetching todos:', error)
-        } finally {
-            setLoading(false)
-        }
-    }
 
     // Load timer state and auto-resume
     useEffect(() => {
@@ -124,85 +118,21 @@ export default function TodoApp() {
     }, [])
 
     // Todo functions
-    const addTodo = async (e) => {
+    const handleAddTodo = async (e) => {
         e.preventDefault()
         if (todoInput.trim()) {
-            try {
-                const res = await fetch('/api/todos', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        text: todoInput.trim(),
-                        priority: todoPriority
-                    })
-                })
-                const data = await res.json()
-                if (data.todo) {
-                    setTodos([...todos, data.todo])
-                    setTodoInput('')
-                    setTodoPriority('medium')
-                }
-            } catch (error) {
-                console.error('Error adding todo:', error)
-            }
+            await hookAddTodo(todoInput.trim(), todoPriority)
+            setTodoInput('')
+            setTodoPriority('medium')
         }
     }
 
-    const toggleTodo = async (id) => {
-        const todo = todos.find(t => t._id === id)
-        if (!todo) return
-
-        // Optimistic update - update UI immediately
-        setTodos(todos.map(t =>
-            t._id === id ? { ...t, completed: !t.completed } : t
-        ))
-
-        try {
-            const res = await fetch(`/api/todos/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ completed: !todo.completed })
-            })
-
-            if (!res.ok) {
-                // Revert on error
-                setTodos(todos.map(t =>
-                    t._id === id ? { ...t, completed: todo.completed } : t
-                ))
-                console.error('Error toggling todo')
-            }
-        } catch (error) {
-            // Revert on error
-            setTodos(todos.map(t =>
-                t._id === id ? { ...t, completed: todo.completed } : t
-            ))
-            console.error('Error toggling todo:', error)
-        }
+    const handleToggleTodo = async (id) => {
+        await hookToggleTodo(id)
     }
 
-    const deleteTodo = async (id) => {
-        // Store the todo in case we need to restore it
-        const todoToDelete = todos.find(t => t._id === id)
-        if (!todoToDelete) return
-
-        // Optimistic update - remove from UI immediately
-        setTodos(todos.filter(todo => todo._id !== id))
-
-        try {
-            const res = await fetch(`/api/todos/${id}`, {
-                method: 'DELETE'
-            })
-
-            if (!res.ok) {
-                // Restore on error
-                setTodos([...todos])
-                console.error('Error deleting todo')
-            }
-        } catch (error) {
-            // Restore on error
-            setTodos([...todos])
-            console.error('Error deleting todo:', error)
-        }
+    const handleDeleteTodo = async (id) => {
+        await hookDeleteTodo(id)
     }
 
     // Priority order for sorting
@@ -331,13 +261,25 @@ export default function TodoApp() {
 
     const activeTodos = todos.filter(t => !t.completed).length
 
+    // Status Badge Logic
+    let statusBadge = null
+    if (!isOnline) {
+        statusBadge = <span style={{ fontSize: '0.6em', background: '#ff4444', color: 'white', padding: '2px 8px', borderRadius: '10px', marginLeft: '10px', verticalAlign: 'middle', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>☁️ Offline</span>
+    } else if (syncStatus === 'syncing') {
+        statusBadge = <span style={{ fontSize: '0.6em', background: '#ffa726', color: 'white', padding: '2px 8px', borderRadius: '10px', marginLeft: '10px', verticalAlign: 'middle', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>🔄 Syncing...</span>
+    }
+    // We can also add 'Synced' tick but usually clean UI is better when everything is fine
+
     return (
         <>
             <div className="background-sloka">{slokas[currentSlokaIndex]}</div>
 
             <div className="container">
                 <header>
-                    <h1>📝 Todo & Pomodoro</h1>
+                    <h1>
+                        📝 Todo & Pomodoro
+                        {statusBadge}
+                    </h1>
                     <p className="subtitle">Stay focused and productive</p>
                 </header>
 
@@ -390,7 +332,7 @@ export default function TodoApp() {
 
                 {/* Todo Section */}
                 <section className="todo-section">
-                    <form onSubmit={addTodo} className="todo-form">
+                    <form onSubmit={handleAddTodo} className="todo-form">
                         <input
                             type="text"
                             placeholder="Add a new task..."
@@ -442,11 +384,11 @@ export default function TodoApp() {
                                         type="checkbox"
                                         className="todo-checkbox"
                                         checked={todo.completed}
-                                        onChange={() => toggleTodo(todo._id)}
+                                        onChange={() => handleToggleTodo(todo._id)}
                                     />
                                     <span
                                         className="todo-text"
-                                        onClick={() => toggleTodo(todo._id)}
+                                        onClick={() => handleToggleTodo(todo._id)}
                                         style={{ cursor: 'pointer' }}
                                     >
                                         {todo.text}
@@ -459,7 +401,7 @@ export default function TodoApp() {
                                     <span className={`priority-badge ${todo.priority}`}>
                                         {todo.priority}
                                     </span>
-                                    <button onClick={() => deleteTodo(todo._id)} className="delete-btn">
+                                    <button onClick={() => handleDeleteTodo(todo._id)} className="delete-btn">
                                         Delete
                                     </button>
                                 </li>
