@@ -171,12 +171,14 @@ export function useOfflineSync(initialTodos = []) {
             setQueue(prev => prev.filter(item => !processedUUIDs.has(item.uuid)))
 
             if (!failed) {
-                // Fetch new data BEFORE setting status to synced to avoid UI flicker
-                // We pass true logic by manually calling the data fetcher
-                const newTodos = await fetchTodosData()
+                // Wait a moment for server to commit all changes
+                await new Promise(resolve => setTimeout(resolve, 500))
 
-                if (newTodos) {
-                    setTodos(newTodos)
+                // Fetch authoritative server data after successful sync
+                const serverTodos = await fetchTodosData()
+
+                if (serverTodos) {
+                    setTodos(serverTodos)
                 }
                 setSyncStatus('synced')
             } else {
