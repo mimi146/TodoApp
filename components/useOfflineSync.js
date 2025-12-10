@@ -91,7 +91,6 @@ export function useOfflineSync(initialTodos = []) {
         if (!navigator.onLine || isSyncingRef.current) return
 
         isSyncingRef.current = true
-        setSyncStatus('syncing')
 
         try {
             const currentQueue = JSON.parse(localStorage.getItem('offlineQueue') || '[]')
@@ -100,6 +99,9 @@ export function useOfflineSync(initialTodos = []) {
                 setSyncStatus('synced')
                 return
             }
+
+            // Only show syncing if we actually have items to sync
+            setSyncStatus('syncing')
 
             let tempIdMap = {} // Maps tempId -> realId
             let processedUUIDs = new Set()
