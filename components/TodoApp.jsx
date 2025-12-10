@@ -43,9 +43,15 @@ export default function TodoApp() {
         "प्रज्ञावादांश्च भाषसे।\nगतासूनगतासूंश्च नानुशोचन्ति पण्डिताः॥\n\n(The wise grieve neither for the living nor for the dead.)"
     ]
 
-    // Initial load
+    // Initial load - only fetch from server if we have no local data
     useEffect(() => {
-        refresh()
+        const storedTodos = localStorage.getItem('todos')
+        const storedQueue = localStorage.getItem('offlineQueue')
+
+        // Only fetch from server if completely new user (no cached data and no pending changes)
+        if (!storedTodos && (!storedQueue || JSON.parse(storedQueue).length === 0)) {
+            refresh()
+        }
     }, [])
 
     // Load timer state and auto-resume
