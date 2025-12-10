@@ -254,7 +254,6 @@ export function useOfflineSync(initialTodos = []) {
                     uuid: generateUUID()
                 }])
                 setSyncStatus('offline')
-                setIsOnline(false)
             }
         }
     }
@@ -292,7 +291,6 @@ export function useOfflineSync(initialTodos = []) {
                     uuid: generateUUID()
                 }])
                 setSyncStatus('offline')
-                setIsOnline(false)
             }
         }
     }
@@ -321,7 +319,6 @@ export function useOfflineSync(initialTodos = []) {
                     uuid: generateUUID()
                 }])
                 setSyncStatus('offline')
-                setIsOnline(false)
             }
         }
     }
