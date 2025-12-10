@@ -96,8 +96,7 @@ export function useOfflineSync(initialTodos = []) {
         try {
             const currentQueue = JSON.parse(localStorage.getItem('offlineQueue') || '[]')
             if (currentQueue.length === 0) {
-                // Only fetch if queue is empty
-                await fetchLatestTodos()
+                // No offline changes to sync, local state is already correct
                 setSyncStatus('synced')
                 return
             }
