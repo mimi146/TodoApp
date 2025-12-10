@@ -197,7 +197,13 @@ export function useOfflineSync(initialTodos = []) {
 
     // Public refresh function
     const fetchLatestTodos = async (force = false) => {
-        if (!navigator.onLine || (!force && queueRef.current.length > 0)) return
+        if (!navigator.onLine) return
+
+        // Check localStorage directly to avoid race condition with state updates
+        const storedQueue = localStorage.getItem('offlineQueue')
+        const hasOfflineChanges = storedQueue && JSON.parse(storedQueue).length > 0
+
+        if (!force && hasOfflineChanges) return
 
         const todosData = await fetchTodosData()
         if (todosData) {
