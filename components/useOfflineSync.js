@@ -101,14 +101,14 @@ export function useOfflineSync(initialTodos = [], user = null) {
     // Flag to prevent concurrent syncs
     const isSyncingRef = useRef(false)
     const lastSyncTimeRef = useRef(0)
+    const mutationInProgressRef = useRef(false) // Lock for public actions
 
     // Mutation Log: Track recent successful syncs to enforce "Read-Your-Writes" consistency
-    // This overlays our recent writes on top of potentially stale server reads.
     // Map<ID, { type: 'ADD'|'UPDATE'|'DELETE', item?: Todo, timestamp: number }>
     const mutationLogRef = useRef(new Map())
 
     // Process the Sync Queue
-    const processQueue = async () => {
+    const processQueue = useCallback(async () => {
         if (!navigator.onLine || isSyncingRef.current || isGuest) return false
 
         isSyncingRef.current = true
@@ -231,6 +231,10 @@ export function useOfflineSync(initialTodos = [], user = null) {
             if (!failed) {
                 setSyncStatus('synced')
                 lastSyncTimeRef.current = Date.now() // Mark successful sync time
+
+                // Add 500ms buffer to let React state updates settle before next actions
+                await new Promise(resolve => setTimeout(resolve, 500))
+
                 return true // Successfully synced changes
             } else {
                 setSyncStatus('offline')
@@ -239,7 +243,81 @@ export function useOfflineSync(initialTodos = [], user = null) {
         } finally {
             isSyncingRef.current = false
         }
-    }
+    }, [isGuest])
+
+    // Initialize online status and listeners
+    useEffect(() => {
+        if (isGuest) {
+            setSyncStatus('local')
+            return
+        }
+
+        setIsOnline(navigator.onLine)
+        setSyncStatus(navigator.onLine ? 'synced' : 'offline')
+
+        const handleOnline = async () => {
+            setIsOnline(true)
+            setSyncStatus('syncing')
+
+            // Push-And-Trust Pattern
+            await processQueue()
+        }
+        const handleOffline = () => {
+            setIsOnline(false)
+            setSyncStatus('offline')
+        }
+
+        const handleVisibilityChange = async () => {
+            if (document.visibilityState === 'visible' && navigator.onLine) {
+                await processQueue()
+            }
+        }
+
+        const handleFocus = async () => {
+            if (navigator.onLine) {
+                await processQueue()
+            }
+        }
+
+        window.addEventListener('online', handleOnline)
+        window.addEventListener('offline', handleOffline)
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        window.addEventListener('focus', handleFocus)
+
+        return () => {
+            window.removeEventListener('online', handleOnline)
+            window.removeEventListener('offline', handleOffline)
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+            window.removeEventListener('focus', handleFocus)
+        }
+    }, [isGuest, processQueue])
+
+    // Load from local storage on mount
+    useEffect(() => {
+        const storedTodos = localStorage.getItem('todos')
+        const storedQueue = localStorage.getItem('offlineQueue')
+
+        if (storedTodos) {
+            setTodos(JSON.parse(storedTodos))
+        }
+        if (storedQueue && !isGuest) {
+            setQueue(JSON.parse(storedQueue))
+            // Process queue after initial load settles to prevent race conditions
+            setTimeout(() => processQueue(), 1000)
+        }
+    }, [isGuest, processQueue])
+
+    // Persist to local storage whenever todos change
+    useEffect(() => {
+        localStorage.setItem('todos', JSON.stringify(todos))
+    }, [todos])
+
+    // Persist queue (only for logged in users)
+    useEffect(() => {
+        if (!isGuest) {
+            localStorage.setItem('offlineQueue', JSON.stringify(queue))
+        }
+    }, [queue, isGuest])
 
     // Helper to fetch data without setting state
     const fetchTodosData = async () => {
@@ -276,7 +354,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
         const storedQueue = localStorage.getItem('offlineQueue')
         const hasOfflineChanges = storedQueue && JSON.parse(storedQueue).length > 0
 
-        // If we have offline changes pending, DO NOT fetch yet.
+        // If we have offline changes pending, DO NOT fetch yet. 
         // Logic: Push local changes first, then fetch in the callback.
         if (!force && hasOfflineChanges) {
             return
@@ -375,6 +453,12 @@ export function useOfflineSync(initialTodos = [], user = null) {
                 uuid: generateUUID()
             }])
         } else {
+            // Serialization lock for concurrent online actions
+            while (mutationInProgressRef.current) {
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
+
+            mutationInProgressRef.current = true
             try {
                 const res = await fetch('/api/todos', {
                     method: 'POST',
@@ -407,6 +491,8 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     uuid: generateUUID()
                 }])
                 setSyncStatus('offline')
+            } finally {
+                mutationInProgressRef.current = false
             }
         }
     }
@@ -431,6 +517,12 @@ export function useOfflineSync(initialTodos = [], user = null) {
                 uuid: generateUUID()
             }])
         } else {
+            // Serialization lock
+            while (mutationInProgressRef.current) {
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
+
+            mutationInProgressRef.current = true
             try {
                 const res = await fetch(`/api/todos/${id}`, {
                     method: 'PUT',
@@ -455,6 +547,8 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     uuid: generateUUID()
                 }])
                 setSyncStatus('offline')
+            } finally {
+                mutationInProgressRef.current = false
             }
         }
     }
@@ -472,6 +566,12 @@ export function useOfflineSync(initialTodos = [], user = null) {
                 uuid: generateUUID()
             }])
         } else {
+            // Serialization lock
+            while (mutationInProgressRef.current) {
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
+
+            mutationInProgressRef.current = true
             try {
                 const res = await fetch(`/api/todos/${id}`, {
                     method: 'DELETE'
@@ -492,6 +592,8 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     uuid: generateUUID()
                 }])
                 setSyncStatus('offline')
+            } finally {
+                mutationInProgressRef.current = false
             }
         }
     }
