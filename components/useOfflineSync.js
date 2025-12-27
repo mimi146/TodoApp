@@ -106,6 +106,11 @@ export function useOfflineSync(initialTodos = [], user = null) {
     // Flag to prevent concurrent syncs
     const isSyncingRef = useRef(false)
 
+    // Mutation Log: Track recent successful syncs to enforce "Read-Your-Writes" consistency
+    // This overlays our recent writes on top of potentially stale server reads.
+    // Map<ID, { type: 'ADD'|'UPDATE'|'DELETE', item?: Todo, timestamp: number }>
+    const mutationLogRef = useRef(new Map())
+
     // Process the Sync Queue
     const processQueue = async () => {
         if (!navigator.onLine || isSyncingRef.current || isGuest) return false
@@ -151,6 +156,13 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
                             tempIdMap[tempId] = realId
 
+                            // Log the ADD so we can inject it if server read is stale
+                            mutationLogRef.current.set(realId, {
+                                type: 'ADD',
+                                item: data.todo,
+                                timestamp: Date.now()
+                            })
+
                             // Update local todos to replace temp ID with real ID immediately
                             setTodos(prev => prev.map(t => t._id === tempId ? { ...t, _id: realId } : t))
                         }
@@ -160,10 +172,24 @@ export function useOfflineSync(initialTodos = [], user = null) {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(action.payload)
                         })
+                        if (res && res.ok) {
+                            // We ideally want the UPDATED item from server to log it
+                            // But if API doesn't return it, we might skip logging UPDATE for now
+                            // or optimistic log? Let's just rely on ADD log for "Lost Task" fix.
+                            // Actually, let's just mark it as 'touched' so we don't prefer stale server data?
+                            // For now, let's keep it simple: fix the "Lost Task" (ADD) issue.
+                            mutationLogRef.current.set(effectiveId, { type: 'UPDATE', timestamp: Date.now() })
+                        }
                     } else if (action.type === 'DELETE') {
                         res = await fetch(`/api/todos/${effectiveId}`, {
                             method: 'DELETE'
                         })
+                        if (res && res.ok) {
+                            mutationLogRef.current.set(effectiveId, {
+                                type: 'DELETE',
+                                timestamp: Date.now()
+                            })
+                        }
                     }
 
                     if (res && !res.ok) {
@@ -233,9 +259,42 @@ export function useOfflineSync(initialTodos = [], user = null) {
             return
         }
 
-        const todosData = await fetchTodosData()
-        if (todosData) {
-            setTodos(todosData)
+        const serverTodos = await fetchTodosData()
+
+        if (serverTodos) {
+            // MERGE STRATEGY: Read-Your-Writes
+            // Overlay our Recent Mutations on top of Server Data
+
+            const now = Date.now()
+            const log = mutationLogRef.current
+
+            // 1. Cleanup old log entries (> 5s)
+            for (const [id, entry] of log.entries()) {
+                if (now - entry.timestamp > 5000) log.delete(id)
+            }
+
+            let mergedTodos = [...serverTodos]
+            const serverIdSet = new Set(serverTodos.map(t => t._id))
+
+            // 2. Inject Missing ADDs (Fixes "Lost Task" / Stale Read)
+            for (const [id, entry] of log.entries()) {
+                if (entry.type === 'ADD' && entry.item && !serverIdSet.has(id)) {
+                    console.log(`[Sync] Bringing back missing recent task: ${id}`)
+                    mergedTodos.push(entry.item)
+                }
+            }
+
+            // 3. Remove Reappearing DELETEs (Fixes "Ghost Task" / Stale Read)
+            mergedTodos = mergedTodos.filter(t => {
+                const entry = log.get(t._id)
+                if (entry && entry.type === 'DELETE') {
+                    console.log(`[Sync] Removing ghost task: ${t._id}`)
+                    return false
+                }
+                return true
+            })
+
+            setTodos(mergedTodos)
         }
     }
 
