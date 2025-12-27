@@ -28,10 +28,18 @@ export function useOfflineSync(initialTodos = [], user = null) {
         setIsOnline(navigator.onLine)
         setSyncStatus(navigator.onLine ? 'synced' : 'offline')
 
-        const handleOnline = () => {
+        const handleOnline = async () => {
             setIsOnline(true)
             setSyncStatus('syncing')
-            processQueue()
+
+            // Push-Then-Fetch Pattern:
+            // 1. First, push all local changes to server
+            const didSync = await processQueue()
+
+            // 2. Then, immediately fetch authoritative state from server
+            // This ensures we get the latest state including our just-pushed changes
+            // and any changes from other devices.
+            await fetchLatestTodos(true)
         }
         const handleOffline = () => {
             setIsOnline(false)
@@ -40,13 +48,15 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && navigator.onLine) {
-                processQueue()
+                // Same logic: push then fetch
+                processQueue().then(() => fetchLatestTodos(true))
             }
         }
 
         const handleFocus = () => {
             if (navigator.onLine) {
-                processQueue()
+                // Same logic: push then fetch
+                processQueue().then(() => fetchLatestTodos(true))
             }
         }
 
@@ -95,11 +105,10 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
     // Flag to prevent concurrent syncs
     const isSyncingRef = useRef(false)
-    const lastSyncTimeRef = useRef(0)
 
     // Process the Sync Queue
     const processQueue = async () => {
-        if (!navigator.onLine || isSyncingRef.current || isGuest) return
+        if (!navigator.onLine || isSyncingRef.current || isGuest) return false
 
         isSyncingRef.current = true
 
@@ -108,7 +117,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
             if (currentQueue.length === 0) {
                 // No offline changes to sync, local state is already correct
                 setSyncStatus('synced')
-                return
+                return false
             }
 
             // Only show syncing if we actually have items to sync
@@ -179,9 +188,10 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
             if (!failed) {
                 setSyncStatus('synced')
-                lastSyncTimeRef.current = Date.now() // Mark sync completion time
+                return true // Successfully synced changes
             } else {
                 setSyncStatus('offline')
+                return false
             }
         } finally {
             isSyncingRef.current = false
@@ -207,10 +217,9 @@ export function useOfflineSync(initialTodos = [], user = null) {
     const fetchLatestTodos = async (force = false) => {
         if (!navigator.onLine || isGuest) return
 
-        // COOL-DOWN CHECK: If we just synced < 2 seconds ago, skip fetch to avoid stale reads
-        // The local state is already up-to-date from processQueue
-        if (!force && Date.now() - lastSyncTimeRef.current < 2000) {
-            console.log('Skipping fetch to avoid stale-read race condition')
+        // If currently executing a push-sync, skip this fetch and let the sync finish
+        if (isSyncingRef.current && !force) {
+            console.log('Skipping fetch - sync in progress')
             return
         }
 
@@ -218,6 +227,8 @@ export function useOfflineSync(initialTodos = [], user = null) {
         const storedQueue = localStorage.getItem('offlineQueue')
         const hasOfflineChanges = storedQueue && JSON.parse(storedQueue).length > 0
 
+        // If we have offline changes pending, DO NOT fetch yet. 
+        // Logic: Push local changes first, then fetch in the callback.
         if (!force && hasOfflineChanges) {
             return
         }
