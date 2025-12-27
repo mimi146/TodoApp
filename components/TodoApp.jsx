@@ -47,11 +47,12 @@ export default function TodoApp({ user }) {
         "प्रज्ञावादांश्च भाषसे।\nगतासूनगतासूंश्च नानुशोचन्ति पण्डिताः॥\n\n(The wise grieve neither for the living nor for the dead.)"
     ]
 
-    // Initial load - only fetch from server if we have no local data
     // Initial load and periodic sync
     useEffect(() => {
-        // Always try to fetch latest from server on mount
-        refresh()
+        // IMPORTANT: Don't call refresh() on mount!
+        // The useOfflineSync hook handles initial sync internally via its event listeners.
+        // Calling refresh() here creates a race condition where server data can overwrite
+        // pending offline changes before processQueue() has a chance to run.
 
         // Poll for updates every 10 seconds to keep devices in sync
         const syncInterval = setInterval(() => {
@@ -60,13 +61,8 @@ export default function TodoApp({ user }) {
             }
         }, 10000)
 
-        // Also refresh when window comes into focus
-        const handleFocus = () => refresh()
-        window.addEventListener('focus', handleFocus)
-
         return () => {
             clearInterval(syncInterval)
-            window.removeEventListener('focus', handleFocus)
         }
     }, [user])
 
