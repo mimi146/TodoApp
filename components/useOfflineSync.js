@@ -95,6 +95,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
     // Flag to prevent concurrent syncs
     const isSyncingRef = useRef(false)
+    const lastSyncTimeRef = useRef(0)
 
     // Process the Sync Queue
     const processQueue = async () => {
@@ -178,6 +179,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
             if (!failed) {
                 setSyncStatus('synced')
+                lastSyncTimeRef.current = Date.now() // Mark sync completion time
             } else {
                 setSyncStatus('offline')
             }
@@ -204,6 +206,13 @@ export function useOfflineSync(initialTodos = [], user = null) {
     // Public refresh function
     const fetchLatestTodos = async (force = false) => {
         if (!navigator.onLine || isGuest) return
+
+        // COOL-DOWN CHECK: If we just synced < 2 seconds ago, skip fetch to avoid stale reads
+        // The local state is already up-to-date from processQueue
+        if (!force && Date.now() - lastSyncTimeRef.current < 2000) {
+            console.log('Skipping fetch to avoid stale-read race condition')
+            return
+        }
 
         // Check localStorage directly to avoid race condition with state updates
         const storedQueue = localStorage.getItem('offlineQueue')
