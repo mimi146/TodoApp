@@ -72,12 +72,21 @@ export function useOfflineSync(initialTodos = [], user = null) {
     useEffect(() => {
         const storedTodos = localStorage.getItem('todos')
         const storedQueue = localStorage.getItem('offlineQueue')
+        const storedLog = localStorage.getItem('mutationLog')
 
         if (storedTodos) {
             setTodos(JSON.parse(storedTodos))
         }
         if (storedQueue && !isGuest) {
             setQueue(JSON.parse(storedQueue))
+        }
+        if (storedLog && !isGuest) {
+            try {
+                const logArray = JSON.parse(storedLog)
+                mutationLogRef.current = new Map(logArray)
+            } catch (e) {
+                console.error("Failed to parse mutation log", e)
+            }
         }
     }, [isGuest])
 
@@ -105,7 +114,14 @@ export function useOfflineSync(initialTodos = [], user = null) {
     // Mutation Log: Track recent successful syncs to enforce "Read-Your-Writes" consistency
     // This overlays our recent writes on top of potentially stale server reads.
     // Map<ID, { type: 'ADD'|'UPDATE'|'DELETE', item?: Todo, timestamp: number }>
+    // Now persisted to localStorage to survive reloads/tab switches!
     const mutationLogRef = useRef(new Map())
+
+    // Helper to persist log
+    const saveMutationLog = () => {
+        const logArray = Array.from(mutationLogRef.current.entries())
+        localStorage.setItem('mutationLog', JSON.stringify(logArray))
+    }
 
     // Process the Sync Queue
     const processQueue = async () => {
@@ -158,6 +174,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
                                 item: data.todo,
                                 timestamp: Date.now()
                             })
+                            saveMutationLog()
 
                             // Update local todos with the FULL server object (authoritative)
                             // This ensures we have the correct ID and any server-generated fields immediately
@@ -195,6 +212,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
                                 item: updatedItem || existingEntry?.item, // Preserve item if possible
                                 timestamp: Date.now()
                             })
+                            saveMutationLog()
                         }
                     } else if (action.type === 'DELETE') {
                         res = await fetch(`/api/todos/${effectiveId}`, {
@@ -205,6 +223,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
                                 type: 'DELETE',
                                 timestamp: Date.now()
                             })
+                            saveMutationLog()
                         }
                     }
 
@@ -240,81 +259,6 @@ export function useOfflineSync(initialTodos = [], user = null) {
             isSyncingRef.current = false
         }
     }
-
-    // Initialize online status and listeners
-    useEffect(() => {
-        if (isGuest) {
-            setSyncStatus('local')
-            return
-        }
-
-        setIsOnline(navigator.onLine)
-        setSyncStatus(navigator.onLine ? 'synced' : 'offline')
-
-        const handleOnline = async () => {
-            setIsOnline(true)
-            setSyncStatus('syncing')
-
-            // Push-And-Trust Pattern:
-            // 1. Push changes. If successful, local state is updated with server response.
-            // 2. Do NOT fetch immediately. Trust the local authoritative state.
-            //    This avoids overwriting perfect local state with stale server data.
-            await processQueue()
-        }
-        const handleOffline = () => {
-            setIsOnline(false)
-            setSyncStatus('offline')
-        }
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible' && navigator.onLine) {
-                processQueue()
-            }
-        }
-
-        const handleFocus = () => {
-            if (navigator.onLine) {
-                processQueue()
-            }
-        }
-
-        window.addEventListener('online', handleOnline)
-        window.addEventListener('offline', handleOffline)
-        document.addEventListener('visibilitychange', handleVisibilityChange)
-        window.addEventListener('focus', handleFocus)
-
-        return () => {
-            window.removeEventListener('online', handleOnline)
-            window.removeEventListener('offline', handleOffline)
-            document.removeEventListener('visibilitychange', handleVisibilityChange)
-            window.removeEventListener('focus', handleFocus)
-        }
-    }, [isGuest])
-
-    // Load from local storage on mount
-    useEffect(() => {
-        const storedTodos = localStorage.getItem('todos')
-        const storedQueue = localStorage.getItem('offlineQueue')
-
-        if (storedTodos) {
-            setTodos(JSON.parse(storedTodos))
-        }
-        if (storedQueue && !isGuest) {
-            setQueue(JSON.parse(storedQueue))
-        }
-    }, [isGuest])
-
-    // Persist to local storage whenever todos change
-    useEffect(() => {
-        localStorage.setItem('todos', JSON.stringify(todos))
-    }, [todos])
-
-    // Persist queue (only for logged in users)
-    useEffect(() => {
-        if (!isGuest) {
-            localStorage.setItem('offlineQueue', JSON.stringify(queue))
-        }
-    }, [queue, isGuest])
 
     // Helper to fetch data without setting state
     const fetchTodosData = async () => {
@@ -360,15 +304,27 @@ export function useOfflineSync(initialTodos = [], user = null) {
         const serverTodos = await fetchTodosData()
 
         if (serverTodos) {
+            // CRITICAL SAFETY: Check sync status AGAIN after the await.
+            // If a sync started while we were fetching (e.g. user came online),
+            // our fetched data is now STALE. Abort!
+            if (isSyncingRef.current && !force) {
+                console.log('Skipping fetch apply - sync started during fetch')
+                return
+            }
             // MERGE STRATEGY: Read-Your-Writes + Queue Protection
 
             const now = Date.now()
             const log = mutationLogRef.current
+            let logChanged = false
 
             // 1. Cleanup old log entries (> 60s window to be super safe)
             for (const [id, entry] of log.entries()) {
-                if (now - entry.timestamp > 60000) log.delete(id)
+                if (now - entry.timestamp > 60000) {
+                    log.delete(id)
+                    logChanged = true
+                }
             }
+            if (logChanged) saveMutationLog()
 
             let mergedTodos = [...serverTodos]
             const serverIdSet = new Set(serverTodos.map(t => t._id))
@@ -470,6 +426,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
                         item: data.todo,
                         timestamp: Date.now()
                     })
+                    saveMutationLog()
                     setTodos(prev => prev.map(t => t._id === tempId ? data.todo : t))
                 }
             } catch (error) {
@@ -520,6 +477,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     item: updatedItem,
                     timestamp: Date.now()
                 })
+                saveMutationLog()
 
             } catch (error) {
                 // Fallback to queue
@@ -558,6 +516,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     type: 'DELETE',
                     timestamp: Date.now()
                 })
+                saveMutationLog()
 
             } catch (error) {
                 // Fallback to queue
