@@ -32,14 +32,11 @@ export function useOfflineSync(initialTodos = [], user = null) {
             setIsOnline(true)
             setSyncStatus('syncing')
 
-            // Push-Then-Fetch Pattern:
-            // 1. First, push all local changes to server
-            const didSync = await processQueue()
-
-            // 2. Then, immediately fetch authoritative state from server
-            // This ensures we get the latest state including our just-pushed changes
-            // and any changes from other devices.
-            await fetchLatestTodos(true)
+            // Push-And-Trust Pattern:
+            // 1. Push changes. If successful, local state is updated with server response.
+            // 2. Do NOT fetch immediately. Trust the local authoritative state.
+            //    This avoids overwriting perfect local state with stale server data.
+            await processQueue()
         }
         const handleOffline = () => {
             setIsOnline(false)
@@ -48,15 +45,13 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && navigator.onLine) {
-                // Same logic: push then fetch
-                processQueue().then(() => fetchLatestTodos(true))
+                processQueue()
             }
         }
 
         const handleFocus = () => {
             if (navigator.onLine) {
-                // Same logic: push then fetch
-                processQueue().then(() => fetchLatestTodos(true))
+                processQueue()
             }
         }
 
@@ -105,6 +100,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
     // Flag to prevent concurrent syncs
     const isSyncingRef = useRef(false)
+    const lastSyncTimeRef = useRef(0)
 
     // Mutation Log: Track recent successful syncs to enforce "Read-Your-Writes" consistency
     // This overlays our recent writes on top of potentially stale server reads.
@@ -163,8 +159,9 @@ export function useOfflineSync(initialTodos = [], user = null) {
                                 timestamp: Date.now()
                             })
 
-                            // Update local todos to replace temp ID with real ID immediately
-                            setTodos(prev => prev.map(t => t._id === tempId ? { ...t, _id: realId } : t))
+                            // Update local todos with the FULL server object (authoritative)
+                            // This ensures we have the correct ID and any server-generated fields immediately
+                            setTodos(prev => prev.map(t => t._id === tempId ? data.todo : t))
                         }
                     } else if (action.type === 'UPDATE') {
                         res = await fetch(`/api/todos/${effectiveId}`, {
@@ -224,6 +221,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
             if (!failed) {
                 setSyncStatus('synced')
+                lastSyncTimeRef.current = Date.now() // Mark successful sync time
                 return true // Successfully synced changes
             } else {
                 setSyncStatus('offline')
@@ -259,11 +257,18 @@ export function useOfflineSync(initialTodos = [], user = null) {
             return
         }
 
+        // COOLDOWN: If we just synced < 5 seconds ago, strict trust in local state.
+        // We do NOT fetch. This avoids overwriting our perfect local state with stale server data.
+        if (!force && Date.now() - lastSyncTimeRef.current < 5000) {
+            console.log('Skipping fetch - within sync cooldown')
+            return
+        }
+
         // Check localStorage directly to avoid race condition with state updates
         const storedQueue = localStorage.getItem('offlineQueue')
         const hasOfflineChanges = storedQueue && JSON.parse(storedQueue).length > 0
 
-        // If we have offline changes pending, DO NOT fetch yet.
+        // If we have offline changes pending, DO NOT fetch yet. 
         // Logic: Push local changes first, then fetch in the callback.
         if (!force && hasOfflineChanges) {
             return
