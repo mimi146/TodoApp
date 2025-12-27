@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useOfflineSync } from './useOfflineSync'
 
-export default function TodoApp() {
+export default function TodoApp({ user }) {
     // State management
     const {
         todos,
@@ -13,7 +13,7 @@ export default function TodoApp() {
         toggleTodo: hookToggleTodo,
         deleteTodo: hookDeleteTodo,
         refresh
-    } = useOfflineSync([])
+    } = useOfflineSync([], user)
 
     const [todoInput, setTodoInput] = useState('')
     const [todoPriority, setTodoPriority] = useState('medium')
@@ -68,7 +68,7 @@ export default function TodoApp() {
             clearInterval(syncInterval)
             window.removeEventListener('focus', handleFocus)
         }
-    }, [])
+    }, [user])
 
     // Load timer state and auto-resume
     useEffect(() => {

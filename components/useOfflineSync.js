@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-export function useOfflineSync(initialTodos = []) {
+export function useOfflineSync(initialTodos = [], user = null) {
     const [todos, setTodos] = useState(initialTodos)
     const [isOnline, setIsOnline] = useState(true)
     const [syncStatus, setSyncStatus] = useState('synced') // 'synced', 'offline', 'syncing'
@@ -11,12 +11,20 @@ export function useOfflineSync(initialTodos = []) {
     // Use refs to access latest state in async callbacks and effects preventing stale closures
     const queueRef = useRef(queue)
 
+    // Guest Mode check
+    const isGuest = !user
+
     useEffect(() => {
         queueRef.current = queue
     }, [queue])
 
     // Initialize online status and listeners
     useEffect(() => {
+        if (isGuest) {
+            setSyncStatus('local')
+            return
+        }
+
         setIsOnline(navigator.onLine)
         setSyncStatus(navigator.onLine ? 'synced' : 'offline')
 
@@ -53,7 +61,7 @@ export function useOfflineSync(initialTodos = []) {
             document.removeEventListener('visibilitychange', handleVisibilityChange)
             window.removeEventListener('focus', handleFocus)
         }
-    }, [])
+    }, [isGuest])
 
     // Load from local storage on mount
     useEffect(() => {
@@ -63,20 +71,22 @@ export function useOfflineSync(initialTodos = []) {
         if (storedTodos) {
             setTodos(JSON.parse(storedTodos))
         }
-        if (storedQueue) {
+        if (storedQueue && !isGuest) {
             setQueue(JSON.parse(storedQueue))
         }
-    }, [])
+    }, [isGuest])
 
     // Persist to local storage whenever todos change
     useEffect(() => {
         localStorage.setItem('todos', JSON.stringify(todos))
     }, [todos])
 
-    // Persist queue
+    // Persist queue (only for logged in users)
     useEffect(() => {
-        localStorage.setItem('offlineQueue', JSON.stringify(queue))
-    }, [queue])
+        if (!isGuest) {
+            localStorage.setItem('offlineQueue', JSON.stringify(queue))
+        }
+    }, [queue, isGuest])
 
     // Helper to generate UUID for queue items
     const generateUUID = () => {
@@ -88,7 +98,7 @@ export function useOfflineSync(initialTodos = []) {
 
     // Process the Sync Queue
     const processQueue = async () => {
-        if (!navigator.onLine || isSyncingRef.current) return
+        if (!navigator.onLine || isSyncingRef.current || isGuest) return
 
         isSyncingRef.current = true
 
@@ -151,11 +161,6 @@ export function useOfflineSync(initialTodos = []) {
                             failed = true
                             break
                         }
-                        // For 4xx errors, we usually consider them "processed" (e.g. invalid ID) to avoid infinite loops,
-                        // unless strictly temporary. Here we assume we can remove them.
-                        // But wait, if an UPDATE 404s because the ADD failed previously (network error), we shouldn't lose it.
-                        // But here we stop at network errors (catch block).
-                        // 404 implies logic error or server data mismatch, which retrying won't fix.
                     }
 
                     // If we got here (ok or handled 4xx), mark as processed
@@ -172,8 +177,6 @@ export function useOfflineSync(initialTodos = []) {
             setQueue(prev => prev.filter(item => !processedUUIDs.has(item.uuid)))
 
             if (!failed) {
-                // Local state is already correct after queue processing
-                // Fetching from server would undo local deletes and cause duplicates
                 setSyncStatus('synced')
             } else {
                 setSyncStatus('offline')
@@ -185,6 +188,7 @@ export function useOfflineSync(initialTodos = []) {
 
     // Helper to fetch data without setting state
     const fetchTodosData = async () => {
+        if (isGuest) return []
         try {
             const res = await fetch('/api/todos', { cache: 'no-store' })
             if (res.ok) {
@@ -199,7 +203,7 @@ export function useOfflineSync(initialTodos = []) {
 
     // Public refresh function
     const fetchLatestTodos = async (force = false) => {
-        if (!navigator.onLine) return
+        if (!navigator.onLine || isGuest) return
 
         // Check localStorage directly to avoid race condition with state updates
         const storedQueue = localStorage.getItem('offlineQueue')
@@ -229,6 +233,8 @@ export function useOfflineSync(initialTodos = []) {
 
         // Optimistic Update
         setTodos(prev => [newTodo, ...prev])
+
+        if (isGuest) return // Local only
 
         if (!navigator.onLine) {
             setQueue(prev => [...prev, {
@@ -276,6 +282,8 @@ export function useOfflineSync(initialTodos = []) {
         // Optimistic Update
         setTodos(prev => prev.map(t => t._id === id ? { ...t, completed: newCompleted } : t))
 
+        if (isGuest) return // Local only
+
         if (!navigator.onLine) {
             setQueue(prev => [...prev, {
                 type: 'UPDATE',
@@ -307,6 +315,8 @@ export function useOfflineSync(initialTodos = []) {
     const deleteTodo = async (id) => {
         // Optimistic Update
         setTodos(prev => prev.filter(t => t._id !== id))
+
+        if (isGuest) return // Local only
 
         if (!navigator.onLine) {
             setQueue(prev => [...prev, {
