@@ -172,13 +172,23 @@ export function useOfflineSync(initialTodos = [], user = null) {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(action.payload)
                         })
+
                         if (res && res.ok) {
-                            // We ideally want the UPDATED item from server to log it
-                            // But if API doesn't return it, we might skip logging UPDATE for now
-                            // or optimistic log? Let's just rely on ADD log for "Lost Task" fix.
-                            // Actually, let's just mark it as 'touched' so we don't prefer stale server data?
-                            // For now, let's keep it simple: fix the "Lost Task" (ADD) issue.
-                            mutationLogRef.current.set(effectiveId, { type: 'UPDATE', timestamp: Date.now() })
+                            const data = await res.json()
+                            // Try to get the updated item from server, or patch our existing log
+                            const existingEntry = mutationLogRef.current.get(effectiveId)
+                            let updatedItem = data.todo
+
+                            if (!updatedItem && existingEntry?.item) {
+                                // If server didn't return item but we have it logged, apply local update
+                                updatedItem = { ...existingEntry.item, ...action.payload }
+                            }
+
+                            mutationLogRef.current.set(effectiveId, {
+                                type: 'UPDATE',
+                                item: updatedItem || existingEntry?.item, // Preserve item if possible
+                                timestamp: Date.now()
+                            })
                         }
                     } else if (action.type === 'DELETE') {
                         res = await fetch(`/api/todos/${effectiveId}`, {
@@ -253,7 +263,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
         const storedQueue = localStorage.getItem('offlineQueue')
         const hasOfflineChanges = storedQueue && JSON.parse(storedQueue).length > 0
 
-        // If we have offline changes pending, DO NOT fetch yet. 
+        // If we have offline changes pending, DO NOT fetch yet.
         // Logic: Push local changes first, then fetch in the callback.
         if (!force && hasOfflineChanges) {
             return
@@ -268,23 +278,34 @@ export function useOfflineSync(initialTodos = [], user = null) {
             const now = Date.now()
             const log = mutationLogRef.current
 
-            // 1. Cleanup old log entries (> 5s)
+            // 1. Cleanup old log entries (> 10s window to be safe)
             for (const [id, entry] of log.entries()) {
-                if (now - entry.timestamp > 5000) log.delete(id)
+                if (now - entry.timestamp > 10000) log.delete(id)
             }
 
             let mergedTodos = [...serverTodos]
             const serverIdSet = new Set(serverTodos.map(t => t._id))
 
-            // 2. Inject Missing ADDs (Fixes "Lost Task" / Stale Read)
+            // 2. Inject Missing Items (ADDs or UPDATEs that server missed)
             for (const [id, entry] of log.entries()) {
-                if (entry.type === 'ADD' && entry.item && !serverIdSet.has(id)) {
+                // If it's supposed to be there (item exists in log) but server missed it
+                if (entry.item && !serverIdSet.has(id)) {
                     console.log(`[Sync] Bringing back missing recent task: ${id}`)
                     mergedTodos.push(entry.item)
                 }
             }
 
-            // 3. Remove Reappearing DELETEs (Fixes "Ghost Task" / Stale Read)
+            // 3. Overlay UPDATES (Server returns stale old version, we overwrite with logged new version)
+            mergedTodos = mergedTodos.map(t => {
+                const entry = log.get(t._id)
+                if (entry && entry.type === 'UPDATE' && entry.item) {
+                    console.log(`[Sync] Overlaying stale task with local update: ${t._id}`)
+                    return entry.item
+                }
+                return t
+            })
+
+            // 4. Remove Reappearing DELETEs (Fixes "Ghost Task" / Stale Read)
             mergedTodos = mergedTodos.filter(t => {
                 const entry = log.get(t._id)
                 if (entry && entry.type === 'DELETE') {
@@ -336,6 +357,13 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
                 const data = await res.json()
                 if (data.todo) {
+                    const realId = data.todo._id
+                    // Log success for consistency
+                    mutationLogRef.current.set(realId, {
+                        type: 'ADD',
+                        item: data.todo,
+                        timestamp: Date.now()
+                    })
                     setTodos(prev => prev.map(t => t._id === tempId ? data.todo : t))
                 }
             } catch (error) {
@@ -357,6 +385,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
         if (!todo) return
 
         const newCompleted = !todo.completed
+        const updatedItem = { ...todo, completed: newCompleted }
 
         // Optimistic Update
         setTodos(prev => prev.map(t => t._id === id ? { ...t, completed: newCompleted } : t))
@@ -378,6 +407,14 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     body: JSON.stringify({ completed: newCompleted })
                 })
                 if (!res.ok) throw new Error(`Failed to update: ${res.status}`)
+
+                // Log success for consistency
+                mutationLogRef.current.set(id, {
+                    type: 'UPDATE',
+                    item: updatedItem,
+                    timestamp: Date.now()
+                })
+
             } catch (error) {
                 // Fallback to queue
                 setQueue(prev => [...prev, {
@@ -409,6 +446,13 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     method: 'DELETE'
                 })
                 if (!res.ok) throw new Error(`Failed to delete: ${res.status}`)
+
+                // Log success for consistency
+                mutationLogRef.current.set(id, {
+                    type: 'DELETE',
+                    timestamp: Date.now()
+                })
+
             } catch (error) {
                 // Fallback to queue
                 setQueue(prev => [...prev, {

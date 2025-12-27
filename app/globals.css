@@ -2,6 +2,15 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    /* PWA Polish: Remove default tap highlight on mobile */
+    -webkit-tap-highlight-color: transparent;
+}
+
+html {
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+    /* Prevent text sizing adjustment on orientation change */
+    -webkit-text-size-adjust: 100%;
 }
 
 :root {
@@ -244,6 +253,10 @@ header h1 {
     cursor: pointer;
     transition: var(--transition);
     font-family: inherit;
+    /* PWA Polish: Native button feel */
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
 }
 
 .btn:hover {
