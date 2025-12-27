@@ -197,19 +197,39 @@ export function useOfflineSync(initialTodos = [], user = null) {
                         })
 
                         if (res && res.ok) {
-                            const data = await res.json()
-                            // Try to get the updated item from server, or patch our existing log
-                            const existingEntry = mutationLogRef.current.get(effectiveId)
-                            let updatedItem = data.todo
+                            // CRITICAL: The API only returns { success: true }, NOT the updated item.
+                            // We MUST manually construct the updated item for the log to prevent data loss.
+                            // We try to find the item in our log first, or we trust the payload.
 
-                            if (!updatedItem && existingEntry?.item) {
-                                // If server didn't return item but we have it logged, apply local update
-                                updatedItem = { ...existingEntry.item, ...action.payload }
-                            }
+                            const existingEntry = mutationLogRef.current.get(effectiveId)
+                            let baseItem = existingEntry?.item
+
+                            // If we don't have it in log (e.g. first sync), we can't fully reconstruct it 
+                            // without the full object. But we can at least log the CHANGES.
+                            // Ideally, we should have the full item.
+                            // For now, let's look it up in the current 'todos' state if not in log!
+                            // However, 'todos' state might be stale in this async context if we didn't use refs?
+                            // Actually, since we are inside processQueue, 'todos' is from closure. 
+                            // BETTER STRATEGY: We just log what we KNOW.
+                            // But the overlay logic expects a FULL item to return.
+
+                            // Let's rely on the fact that if we are updating, we likely have it in 'todos'.
+                            // But accessing 'todos' here is tricky due to closure.
+
+                            // FALLBACK: We construct a partial item with just the ID and the changes.
+                            // The overlay logic in fetchLatestTodos needs to be smart enough effectively merge this.
+                            // OR, we just assume that if we don't have baseItem, we skip logging the ITEM but keep the entry type?
+                            // No, overlay needs the item.
+
+                            // BEST FIX: Since we lack the full item from server, we should probably fetch it?
+                            // No, that delays things.
+
+                            // Let's try to patch whatever previous entry we had.
+                            const updatedItem = { ...(baseItem || {}), _id: effectiveId, ...action.payload }
 
                             mutationLogRef.current.set(effectiveId, {
                                 type: 'UPDATE',
-                                item: updatedItem || existingEntry?.item, // Preserve item if possible
+                                item: updatedItem,
                                 timestamp: Date.now()
                             })
                             saveMutationLog()
