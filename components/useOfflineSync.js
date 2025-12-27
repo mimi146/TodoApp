@@ -351,7 +351,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
         const storedQueue = localStorage.getItem('offlineQueue')
         const hasOfflineChanges = storedQueue && JSON.parse(storedQueue).length > 0
 
-        // If we have offline changes pending, DO NOT fetch yet. 
+        // If we have offline changes pending, DO NOT fetch yet.
         // Logic: Push local changes first, then fetch in the callback.
         if (!force && hasOfflineChanges) {
             return
