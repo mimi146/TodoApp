@@ -417,14 +417,7 @@ export default function TodoApp({ user }) {
                 {/* Pomodoro Section */}
                 <section className="pomodoro-section">
                     <div className="timer-display">
-                        <div className="animation-container" style={{ marginBottom: '10px', fontSize: '2rem' }}>
-                            {timerMode === 'work' ? (
-                                <span className={isRunning ? 'animate-pulse' : ''}>🧠</span>
-                            ) : (
-                                <span className={isRunning ? 'animate-sway' : ''}>☕</span>
-                            )}
-                        </div>
-                        <svg className="timer-ring" width="110" height="110" viewBox="0 0 110 110">
+                        <svg className="timer-ring" width="220" height="220" viewBox="0 0 110 110">
                             <circle className="timer-ring-background" cx="55" cy="55" r={radius} />
                             <circle
                                 className="timer-ring-progress"
@@ -438,8 +431,15 @@ export default function TodoApp({ user }) {
                                 }}
                             />
                         </svg>
-                        <div className="timer-content">
-                            <span id="timer">{formatTime(timeRemaining)}</span>
+                        <div className="timer-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <div className="animation-container" style={{ marginBottom: '5px', fontSize: '1.5rem', lineHeight: 1 }}>
+                                {timerMode === 'work' ? (
+                                    <span className={isRunning ? 'animate-pulse' : ''}>🧠</span>
+                                ) : (
+                                    <span className={isRunning ? 'animate-sway' : ''}>☕</span>
+                                )}
+                            </div>
+                            <span id="timer" style={{ lineHeight: 1, marginBottom: '2px' }}>{formatTime(timeRemaining)}</span>
                             <span className="timer-label">
                                 {timerMode === 'work' ? 'Focus' : 'Break'} (Cycle {cycleCount}/4)
                             </span>

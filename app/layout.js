@@ -1,16 +1,38 @@
 import './globals.css'
 
 export const metadata = {
-    title: 'Todo & Pomodoro',
-    description: 'Productivity app with Pomodoro timer and Bhagavad Gita wisdom',
+    title: 'Todo & Pomodoro Focus App | Stay Productive',
+    description: 'A powerful Todo App with built-in Pomodoro Timer, 4-frame work/break cycle, focus sounds (Binaural beats), and offline support based on Bhagavad Gita wisdom. Stay productive with distraction-free focus.',
+    keywords: ['todo app', 'pomodoro timer', 'focus timer', 'productivity tool', 'offline todo', 'task manager', 'binaural beats', 'study timer', 'work timer'],
+    authors: [{ name: 'Milan Niroula' }],
+    creator: 'Milan Niroula',
+    publisher: 'Milan Niroula',
     viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
     manifest: '/manifest.json',
+    themeColor: '#6b7c4f',
     appleWebApp: {
         capable: true,
         statusBarStyle: 'black-translucent',
-        title: 'Todo & Pomodoro'
+        title: 'Todo Focus'
     },
-    themeColor: '#6b7c4f',
+    openGraph: {
+        title: 'Todo & Pomodoro Focus App',
+        description: 'Boost your productivity with this offline-first Todo App and Pomodoro Timer featuring focus sounds and a 4-frame cycle.',
+        url: 'https://milantodo.vercel.app',
+        siteName: 'Todo & Pomodoro Focus',
+        locale: 'en_US',
+        type: 'website',
+    },
+    twitter: {
+        card: 'summary_large_image',
+        title: 'Todo & Pomodoro Focus App',
+        description: 'Boost productivity with offline-first Todo App & Pomodoro Timer.',
+        creator: '@milanniroula',
+    },
+    robots: {
+        index: true,
+        follow: true,
+    }
 }
 
 export default function RootLayout({ children }) {
