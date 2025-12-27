@@ -101,14 +101,14 @@ export function useOfflineSync(initialTodos = [], user = null) {
     // Flag to prevent concurrent syncs
     const isSyncingRef = useRef(false)
     const lastSyncTimeRef = useRef(0)
-    const mutationInProgressRef = useRef(false) // Lock for public actions
 
     // Mutation Log: Track recent successful syncs to enforce "Read-Your-Writes" consistency
+    // This overlays our recent writes on top of potentially stale server reads.
     // Map<ID, { type: 'ADD'|'UPDATE'|'DELETE', item?: Todo, timestamp: number }>
     const mutationLogRef = useRef(new Map())
 
     // Process the Sync Queue
-    const processQueue = useCallback(async () => {
+    const processQueue = async () => {
         if (!navigator.onLine || isSyncingRef.current || isGuest) return false
 
         isSyncingRef.current = true
@@ -231,10 +231,6 @@ export function useOfflineSync(initialTodos = [], user = null) {
             if (!failed) {
                 setSyncStatus('synced')
                 lastSyncTimeRef.current = Date.now() // Mark successful sync time
-
-                // Add 500ms buffer to let React state updates settle before next actions
-                await new Promise(resolve => setTimeout(resolve, 500))
-
                 return true // Successfully synced changes
             } else {
                 setSyncStatus('offline')
@@ -243,7 +239,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
         } finally {
             isSyncingRef.current = false
         }
-    }, [isGuest])
+    }
 
     // Initialize online status and listeners
     useEffect(() => {
@@ -259,7 +255,10 @@ export function useOfflineSync(initialTodos = [], user = null) {
             setIsOnline(true)
             setSyncStatus('syncing')
 
-            // Push-And-Trust Pattern
+            // Push-And-Trust Pattern:
+            // 1. Push changes. If successful, local state is updated with server response.
+            // 2. Do NOT fetch immediately. Trust the local authoritative state.
+            //    This avoids overwriting perfect local state with stale server data.
             await processQueue()
         }
         const handleOffline = () => {
@@ -267,15 +266,15 @@ export function useOfflineSync(initialTodos = [], user = null) {
             setSyncStatus('offline')
         }
 
-        const handleVisibilityChange = async () => {
+        const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && navigator.onLine) {
-                await processQueue()
+                processQueue()
             }
         }
 
-        const handleFocus = async () => {
+        const handleFocus = () => {
             if (navigator.onLine) {
-                await processQueue()
+                processQueue()
             }
         }
 
@@ -290,7 +289,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
             document.removeEventListener('visibilitychange', handleVisibilityChange)
             window.removeEventListener('focus', handleFocus)
         }
-    }, [isGuest, processQueue])
+    }, [isGuest])
 
     // Load from local storage on mount
     useEffect(() => {
@@ -302,10 +301,8 @@ export function useOfflineSync(initialTodos = [], user = null) {
         }
         if (storedQueue && !isGuest) {
             setQueue(JSON.parse(storedQueue))
-            // Process queue after initial load settles to prevent race conditions
-            setTimeout(() => processQueue(), 1000)
         }
-    }, [isGuest, processQueue])
+    }, [isGuest])
 
     // Persist to local storage whenever todos change
     useEffect(() => {
@@ -453,12 +450,6 @@ export function useOfflineSync(initialTodos = [], user = null) {
                 uuid: generateUUID()
             }])
         } else {
-            // Serialization lock for concurrent online actions
-            while (mutationInProgressRef.current) {
-                await new Promise(resolve => setTimeout(resolve, 100))
-            }
-
-            mutationInProgressRef.current = true
             try {
                 const res = await fetch('/api/todos', {
                     method: 'POST',
@@ -491,8 +482,6 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     uuid: generateUUID()
                 }])
                 setSyncStatus('offline')
-            } finally {
-                mutationInProgressRef.current = false
             }
         }
     }
@@ -517,12 +506,6 @@ export function useOfflineSync(initialTodos = [], user = null) {
                 uuid: generateUUID()
             }])
         } else {
-            // Serialization lock
-            while (mutationInProgressRef.current) {
-                await new Promise(resolve => setTimeout(resolve, 100))
-            }
-
-            mutationInProgressRef.current = true
             try {
                 const res = await fetch(`/api/todos/${id}`, {
                     method: 'PUT',
@@ -547,8 +530,6 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     uuid: generateUUID()
                 }])
                 setSyncStatus('offline')
-            } finally {
-                mutationInProgressRef.current = false
             }
         }
     }
@@ -566,12 +547,6 @@ export function useOfflineSync(initialTodos = [], user = null) {
                 uuid: generateUUID()
             }])
         } else {
-            // Serialization lock
-            while (mutationInProgressRef.current) {
-                await new Promise(resolve => setTimeout(resolve, 100))
-            }
-
-            mutationInProgressRef.current = true
             try {
                 const res = await fetch(`/api/todos/${id}`, {
                     method: 'DELETE'
@@ -592,8 +567,6 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     uuid: generateUUID()
                 }])
                 setSyncStatus('offline')
-            } finally {
-                mutationInProgressRef.current = false
             }
         }
     }
