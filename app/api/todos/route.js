@@ -4,6 +4,8 @@ import { ObjectId } from 'mongodb'
 import { getSession } from '@/lib/auth/session'
 import { isAdmin } from '@/lib/auth/admin'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/todos - Fetch all todos for authenticated user (or all if admin)
 export async function GET() {
     try {

@@ -548,8 +548,53 @@ header h1 {
     }
 }
 
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes sway {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    25% {
+        transform: rotate(-10deg);
+    }
+
+    75% {
+        transform: rotate(10deg);
+    }
+
+    100% {
+        transform: rotate(0deg);
+    }
+}
+
 .todo-item {
     animation: fadeIn 0.3s ease;
+}
+
+.animate-pulse {
+    animation: pulse 2s infinite ease-in-out;
+    display: inline-block;
+}
+
+.animate-sway {
+    animation: sway 2s infinite ease-in-out;
+    display: inline-block;
 }
 
 
@@ -744,6 +789,7 @@ header h1 {
         bottom: 10px;
     }
 }
+
 /* Authentication Styles */
 .auth-container {
     min-height: 100vh;

@@ -22,6 +22,10 @@ export default function TodoApp() {
     const [totalTime, setTotalTime] = useState(25 * 60)
     const [isRunning, setIsRunning] = useState(false)
     const [pomodoroMinutes, setPomodoroMinutes] = useState(25)
+    // Pomodoro State Machine
+    const [timerMode, setTimerMode] = useState('work') // 'work' | 'break'
+    const [cycleCount, setCycleCount] = useState(1) // 1 to 4
+
     const [currentSlokaIndex, setCurrentSlokaIndex] = useState(0)
     const [isAdmin, setIsAdmin] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -44,13 +48,25 @@ export default function TodoApp() {
     ]
 
     // Initial load - only fetch from server if we have no local data
+    // Initial load and periodic sync
     useEffect(() => {
-        const storedTodos = localStorage.getItem('todos')
-        const storedQueue = localStorage.getItem('offlineQueue')
+        // Always try to fetch latest from server on mount
+        refresh()
 
-        // Only fetch from server if completely new user (no cached data and no pending changes)
-        if (!storedTodos && (!storedQueue || JSON.parse(storedQueue).length === 0)) {
-            refresh()
+        // Poll for updates every 10 seconds to keep devices in sync
+        const syncInterval = setInterval(() => {
+            if (document.visibilityState === 'visible' && navigator.onLine) {
+                refresh()
+            }
+        }, 10000)
+
+        // Also refresh when window comes into focus
+        const handleFocus = () => refresh()
+        window.addEventListener('focus', handleFocus)
+
+        return () => {
+            clearInterval(syncInterval)
+            window.removeEventListener('focus', handleFocus)
         }
     }, [])
 
@@ -59,9 +75,20 @@ export default function TodoApp() {
         const stored = localStorage.getItem('timerState')
         if (stored) {
             const timerState = JSON.parse(stored)
-            setTimeRemaining(timerState.timeRemaining)
             setTotalTime(timerState.totalTime)
             setPomodoroMinutes(Math.floor(timerState.totalTime / 60))
+
+            if (timerState.mode) setTimerMode(timerState.mode)
+            if (timerState.cycle) setCycleCount(timerState.cycle)
+
+            // If timer finished (0), do NOT auto-reset to full time blindly if we need to transition modes
+            // But if we are reloading a "finished" state, we should probably be in the NEXT state waiting to start
+            // For simplicity, if stored state is 0, we assume the user already handled it or we reset to current settings
+            if (timerState.timeRemaining <= 0) {
+                setTimeRemaining(timerState.totalTime)
+            } else {
+                setTimeRemaining(timerState.timeRemaining)
+            }
 
             // Auto-resume if was running
             if (timerState.wasRunning) {
@@ -71,6 +98,12 @@ export default function TodoApp() {
 
                 if (newTimeRemaining > 0) {
                     setIsRunning(true)
+                } else {
+                    // If it expired while closed, we should handle transition... 
+                    // But simpler to just show 0 and let user click RESET or START to trigger transition logic?
+                    // Let's let it sit at 0 so user sees it finished.
+                    setIsRunning(false)
+                    setTimeRemaining(0)
                 }
             }
         }
@@ -88,7 +121,9 @@ export default function TodoApp() {
                         timeRemaining: newTime,
                         totalTime,
                         wasRunning: true,
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
+                        mode: timerMode,
+                        cycle: cycleCount
                     }
                     localStorage.setItem('timerState', JSON.stringify(timerState))
 
@@ -96,6 +131,37 @@ export default function TodoApp() {
                         setIsRunning(false)
                         playBeep()
                         showNotification()
+
+                        // Handle State Transition
+                        if (timerMode === 'work') {
+                            // Work -> Break
+                            setTimerMode('break')
+                            const breakTime = 5 * 60
+                            setTotalTime(breakTime)
+                            setTimeRemaining(breakTime)
+                            // Auto-start break? User didn't specify. Let's make it MANUAL start for break to be annoying/safe?
+                            // Or consistent with "let's make" implies a system.
+                            // I'll make it ready to start (manual).
+                        } else {
+                            // Break -> Work
+                            // Check cycle
+                            if (cycleCount >= 4) {
+                                // Reset cycle
+                                setCycleCount(1)
+                                setTimerMode('work')
+                                const workTime = pomodoroMinutes * 60
+                                setTotalTime(workTime)
+                                setTimeRemaining(workTime)
+                            } else {
+                                // Next cycle
+                                setCycleCount(prev => prev + 1)
+                                setTimerMode('work')
+                                const workTime = pomodoroMinutes * 60
+                                setTotalTime(workTime)
+                                setTimeRemaining(workTime)
+                            }
+                        }
+
                         return 0
                     }
                     return newTime
@@ -164,6 +230,9 @@ export default function TodoApp() {
     // Timer functions
     const startTimer = () => {
         if (!isRunning) {
+            if (timeRemaining <= 0) {
+                setTimeRemaining(totalTime)
+            }
             playStartBeep()
             setIsRunning(true)
         }
@@ -175,30 +244,70 @@ export default function TodoApp() {
             timeRemaining,
             totalTime,
             wasRunning: false,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            mode: timerMode,
+            cycle: cycleCount
         }
         localStorage.setItem('timerState', JSON.stringify(timerState))
     }
 
     const resetTimer = () => {
         setIsRunning(false)
-        setTimeRemaining(totalTime)
+
+        let newTime
+        if (timerMode === 'work') {
+            const mins = parseInt(pomodoroMinutes) || 25
+            newTime = mins * 60
+        } else {
+            newTime = 5 * 60
+        }
+
+        setTimeRemaining(newTime)
+        setTotalTime(newTime)
+
         const timerState = {
-            timeRemaining: totalTime,
-            totalTime,
+            timeRemaining: newTime,
+            totalTime: newTime,
             wasRunning: false,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            mode: timerMode,
+            cycle: cycleCount
         }
         localStorage.setItem('timerState', JSON.stringify(timerState))
     }
 
+    // Focus Sound
+    const [isPlayingSound, setIsPlayingSound] = useState(false)
+    const audioRef = useRef(null)
+
+    const toggleSound = () => {
+        if (!audioRef.current) return
+
+        if (isPlayingSound) {
+            audioRef.current.pause()
+            setIsPlayingSound(false)
+        } else {
+            audioRef.current.play().catch(e => console.log('Audio play failed:', e))
+            setIsPlayingSound(true)
+        }
+    }
+
     const setTimerMinutes = (e) => {
-        const minutes = parseInt(e.target.value) || 25
-        setPomodoroMinutes(minutes)
-        const seconds = minutes * 60
-        setTotalTime(seconds)
-        setTimeRemaining(seconds)
-        setIsRunning(false)
+        const val = e.target.value
+        if (val === '') {
+            setPomodoroMinutes('')
+            return
+        }
+
+        const minutes = parseInt(val)
+        if (!isNaN(minutes) && minutes > 0 && minutes <= 120) {
+            setPomodoroMinutes(minutes)
+            if (!isRunning && timerMode === 'work') {
+                const seconds = minutes * 60
+                setTotalTime(seconds)
+                setTimeRemaining(seconds)
+            }
+        }
     }
 
     const playBeep = () => {
@@ -289,6 +398,13 @@ export default function TodoApp() {
         <>
             <div className="background-sloka">{slokas[currentSlokaIndex]}</div>
 
+            {/* Focus Sound Audio */}
+            <audio
+                ref={audioRef}
+                src="https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3"
+                loop
+            />
+
             <div className="container">
                 {statusBadge}
                 <header>
@@ -301,6 +417,13 @@ export default function TodoApp() {
                 {/* Pomodoro Section */}
                 <section className="pomodoro-section">
                     <div className="timer-display">
+                        <div className="animation-container" style={{ marginBottom: '10px', fontSize: '2rem' }}>
+                            {timerMode === 'work' ? (
+                                <span className={isRunning ? 'animate-pulse' : ''}>🧠</span>
+                            ) : (
+                                <span className={isRunning ? 'animate-sway' : ''}>☕</span>
+                            )}
+                        </div>
                         <svg className="timer-ring" width="110" height="110" viewBox="0 0 110 110">
                             <circle className="timer-ring-background" cx="55" cy="55" r={radius} />
                             <circle
@@ -310,37 +433,56 @@ export default function TodoApp() {
                                 r={radius}
                                 style={{
                                     strokeDasharray: circumference,
-                                    strokeDashoffset: strokeDashoffset
+                                    strokeDashoffset: strokeDashoffset,
+                                    stroke: timerMode === 'break' ? '#4CAF50' : '#ff6b6b'
                                 }}
                             />
                         </svg>
                         <div className="timer-content">
                             <span id="timer">{formatTime(timeRemaining)}</span>
-                            <span className="timer-label">Focus Time</span>
+                            <span className="timer-label">
+                                {timerMode === 'work' ? 'Focus' : 'Break'} (Cycle {cycleCount}/4)
+                            </span>
                         </div>
                     </div>
 
                     <div className="timer-controls">
-                        <button onClick={startTimer} disabled={isRunning} className="btn btn-primary">
-                            Start
-                        </button>
-                        <button onClick={pauseTimer} disabled={!isRunning} className="btn btn-secondary">
-                            Pause
+                        <button onClick={isRunning ? pauseTimer : startTimer} className={`btn btn-primary ${isRunning ? 'running' : ''}`}>
+                            {isRunning ? 'Pause' : 'Start'}
                         </button>
                         <button onClick={resetTimer} className="btn btn-secondary">
                             Reset
                         </button>
+                        <button
+                            onClick={toggleSound}
+                            className={`btn btn-secondary ${isPlayingSound ? 'active' : ''}`}
+                            title="Toggle Focus Sound"
+                            style={{
+                                background: isPlayingSound ? 'var(--primary-color)' : '',
+                                color: isPlayingSound ? 'white' : ''
+                            }}
+                        >
+                            {isPlayingSound ? '🔊' : '🔇'}
+                        </button>
                     </div>
 
-                    <div className="timer-settings">
-                        <label htmlFor="pomodoroMinutes">Minutes:</label>
+                    <div className="timer-settings" style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <input
                             type="number"
                             id="pomodoroMinutes"
-                            min="1"
-                            max="60"
                             value={pomodoroMinutes}
                             onChange={setTimerMinutes}
+                            disabled={isRunning || timerMode !== 'work'}
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.1)',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                borderRadius: '4px',
+                                color: 'var(--text-primary)',
+                                padding: '4px 8px',
+                                width: '50px',
+                                textAlign: 'center',
+                                outline: 'none'
+                            }}
                         />
                     </div>
                 </section>

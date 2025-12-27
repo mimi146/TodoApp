@@ -186,7 +186,7 @@ export function useOfflineSync(initialTodos = []) {
     // Helper to fetch data without setting state
     const fetchTodosData = async () => {
         try {
-            const res = await fetch('/api/todos')
+            const res = await fetch('/api/todos', { cache: 'no-store' })
             if (res.ok) {
                 const data = await res.json()
                 return data.todos || []
@@ -205,7 +205,9 @@ export function useOfflineSync(initialTodos = []) {
         const storedQueue = localStorage.getItem('offlineQueue')
         const hasOfflineChanges = storedQueue && JSON.parse(storedQueue).length > 0
 
-        if (!force && hasOfflineChanges) return
+        if (!force && hasOfflineChanges) {
+            return
+        }
 
         const todosData = await fetchTodosData()
         if (todosData) {
@@ -242,6 +244,11 @@ export function useOfflineSync(initialTodos = []) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text, priority })
                 })
+
+                if (!res.ok) {
+                    throw new Error(`Server error: ${res.status}`)
+                }
+
                 const data = await res.json()
                 if (data.todo) {
                     setTodos(prev => prev.map(t => t._id === tempId ? data.todo : t))
@@ -283,7 +290,7 @@ export function useOfflineSync(initialTodos = []) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ completed: newCompleted })
                 })
-                if (!res.ok) throw new Error('Failed to update')
+                if (!res.ok) throw new Error(`Failed to update: ${res.status}`)
             } catch (error) {
                 // Fallback to queue
                 setQueue(prev => [...prev, {
@@ -312,7 +319,7 @@ export function useOfflineSync(initialTodos = []) {
                 const res = await fetch(`/api/todos/${id}`, {
                     method: 'DELETE'
                 })
-                if (!res.ok) throw new Error('Failed to delete')
+                if (!res.ok) throw new Error(`Failed to delete: ${res.status}`)
             } catch (error) {
                 // Fallback to queue
                 setQueue(prev => [...prev, {
