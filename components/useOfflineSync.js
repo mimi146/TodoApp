@@ -161,7 +161,16 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
                             // Update local todos with the FULL server object (authoritative)
                             // This ensures we have the correct ID and any server-generated fields immediately
-                            setTodos(prev => prev.map(t => t._id === tempId ? data.todo : t))
+                            setTodos(prev => {
+                                const exists = prev.some(t => t._id === tempId)
+                                if (exists) {
+                                    return prev.map(t => t._id === tempId ? data.todo : t)
+                                } else {
+                                    // Race condition protection: If a background fetch wiped our temp item,
+                                    // re-inject the now-confirmed real item at the top.
+                                    return [data.todo, ...prev]
+                                }
+                            })
                         }
                     } else if (action.type === 'UPDATE') {
                         res = await fetch(`/api/todos/${effectiveId}`, {
@@ -257,9 +266,8 @@ export function useOfflineSync(initialTodos = [], user = null) {
             return
         }
 
-        // COOLDOWN: If we just synced < 5 seconds ago, strict trust in local state.
-        // We do NOT fetch. This avoids overwriting our perfect local state with stale server data.
-        if (!force && Date.now() - lastSyncTimeRef.current < 5000) {
+        // COOLDOWN: If we just synced < 10 seconds ago, strict trust in local state.
+        if (!force && Date.now() - lastSyncTimeRef.current < 10000) {
             console.log('Skipping fetch - within sync cooldown')
             return
         }
@@ -268,7 +276,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
         const storedQueue = localStorage.getItem('offlineQueue')
         const hasOfflineChanges = storedQueue && JSON.parse(storedQueue).length > 0
 
-        // If we have offline changes pending, DO NOT fetch yet. 
+        // If we have offline changes pending, DO NOT fetch yet.
         // Logic: Push local changes first, then fetch in the callback.
         if (!force && hasOfflineChanges) {
             return
@@ -277,15 +285,14 @@ export function useOfflineSync(initialTodos = [], user = null) {
         const serverTodos = await fetchTodosData()
 
         if (serverTodos) {
-            // MERGE STRATEGY: Read-Your-Writes
-            // Overlay our Recent Mutations on top of Server Data
+            // MERGE STRATEGY: Read-Your-Writes + Queue Protection
 
             const now = Date.now()
             const log = mutationLogRef.current
 
-            // 1. Cleanup old log entries (> 10s window to be safe)
+            // 1. Cleanup old log entries (> 60s window to be super safe)
             for (const [id, entry] of log.entries()) {
-                if (now - entry.timestamp > 10000) log.delete(id)
+                if (now - entry.timestamp > 60000) log.delete(id)
             }
 
             let mergedTodos = [...serverTodos]
@@ -299,6 +306,25 @@ export function useOfflineSync(initialTodos = [], user = null) {
                     mergedTodos.push(entry.item)
                 }
             }
+
+            // 3. Inject Queue Items (Optimistic updates that haven't synced yet)
+            // Even though we check 'hasOfflineChanges', queueRef might have fresher state in race conditions
+            const currentQueue = queueRef.current || []
+            currentQueue.forEach(action => {
+                if (action.type === 'ADD' && action.payload) {
+                    // We need to construct the temp item to show it
+                    // It might already be in 'mergedTodos' if we mapped it, but let's be safe
+                    // We only add if the ID isn't there
+                    if (!mergedTodos.find(t => t._id === action.id)) {
+                        mergedTodos.unshift({
+                            _id: action.id,
+                            ...action.payload,
+                            completed: false,
+                            createdAt: new Date().toISOString()
+                        })
+                    }
+                }
+            })
 
             // 3. Overlay UPDATES (Server returns stale old version, we overwrite with logged new version)
             mergedTodos = mergedTodos.map(t => {
