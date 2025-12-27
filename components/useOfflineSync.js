@@ -381,8 +381,11 @@ export function useOfflineSync(initialTodos = [], user = null) {
             mergedTodos = mergedTodos.map(t => {
                 const entry = log.get(t._id)
                 if (entry && entry.type === 'UPDATE' && entry.item) {
-                    console.log(`[Sync] Overlaying stale task with local update: ${t._id}`)
-                    return entry.item
+                    console.log(`[Sync] Overlaying stale task with local update: ${t._id}`, entry.item)
+                    // CRITICAL FIX: Merge the log item INTO the server item.
+                    // The log item might be partial (only containing the changed fields like 'completed')
+                    // if it was constructed manually in processQueue without the full previous state.
+                    return { ...t, ...entry.item }
                 }
                 return t
             })
