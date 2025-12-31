@@ -105,63 +105,64 @@ export default function TodoApp({ user }) {
         }
     }, [])
 
-    // Timer tick effect
+    // Timer tick effect - timestamp-based to prevent pause when minimized
     useEffect(() => {
         if (isRunning) {
+            // Save the start timestamp when timer begins
+            const startTime = Date.now()
+            const startingTimeRemaining = timeRemaining
+
             timerInterval.current = setInterval(() => {
-                setTimeRemaining(prev => {
-                    const newTime = prev - 1
+                // Calculate elapsed time from the start timestamp
+                const elapsed = Math.floor((Date.now() - startTime) / 1000)
+                const newTime = Math.max(0, startingTimeRemaining - elapsed)
 
-                    // Save state
-                    const timerState = {
-                        timeRemaining: newTime,
-                        totalTime,
-                        wasRunning: true,
-                        timestamp: Date.now(),
-                        mode: timerMode,
-                        cycle: cycleCount
-                    }
-                    localStorage.setItem('timerState', JSON.stringify(timerState))
+                setTimeRemaining(newTime)
 
-                    if (newTime <= 0) {
-                        setIsRunning(false)
-                        playBeep()
-                        showNotification()
+                // Save state with current timestamp
+                const timerState = {
+                    timeRemaining: newTime,
+                    totalTime,
+                    wasRunning: true,
+                    timestamp: Date.now(),
+                    mode: timerMode,
+                    cycle: cycleCount
+                }
+                localStorage.setItem('timerState', JSON.stringify(timerState))
 
-                        // Handle State Transition
-                        if (timerMode === 'work') {
-                            // Work -> Break
-                            setTimerMode('break')
-                            const breakTime = 5 * 60
-                            setTotalTime(breakTime)
-                            setTimeRemaining(breakTime)
-                            // Auto-start break? User didn't specify. Let's make it MANUAL start for break to be annoying/safe?
-                            // Or consistent with "let's make" implies a system.
-                            // I'll make it ready to start (manual).
+                if (newTime <= 0) {
+                    setIsRunning(false)
+                    clearInterval(timerInterval.current)
+                    playBeep()
+                    showNotification()
+
+                    // Handle State Transition
+                    if (timerMode === 'work') {
+                        // Work -> Break
+                        setTimerMode('break')
+                        const breakTime = 5 * 60
+                        setTotalTime(breakTime)
+                        setTimeRemaining(breakTime)
+                    } else {
+                        // Break -> Work
+                        // Check cycle
+                        if (cycleCount >= 4) {
+                            // Reset cycle
+                            setCycleCount(1)
+                            setTimerMode('work')
+                            const workTime = pomodoroMinutes * 60
+                            setTotalTime(workTime)
+                            setTimeRemaining(workTime)
                         } else {
-                            // Break -> Work
-                            // Check cycle
-                            if (cycleCount >= 4) {
-                                // Reset cycle
-                                setCycleCount(1)
-                                setTimerMode('work')
-                                const workTime = pomodoroMinutes * 60
-                                setTotalTime(workTime)
-                                setTimeRemaining(workTime)
-                            } else {
-                                // Next cycle
-                                setCycleCount(prev => prev + 1)
-                                setTimerMode('work')
-                                const workTime = pomodoroMinutes * 60
-                                setTotalTime(workTime)
-                                setTimeRemaining(workTime)
-                            }
+                            // Next cycle
+                            setCycleCount(prev => prev + 1)
+                            setTimerMode('work')
+                            const workTime = pomodoroMinutes * 60
+                            setTotalTime(workTime)
+                            setTimeRemaining(workTime)
                         }
-
-                        return 0
                     }
-                    return newTime
-                })
+                }
             }, 1000)
         } else {
             if (timerInterval.current) {
@@ -174,7 +175,34 @@ export default function TodoApp({ user }) {
                 clearInterval(timerInterval.current)
             }
         }
-    }, [isRunning, totalTime])
+    }, [isRunning, timeRemaining, totalTime, timerMode, cycleCount])
+
+    // Page Visibility API - sync time when tab becomes visible
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && isRunning) {
+                // Sync time from localStorage when user returns to tab
+                const stored = localStorage.getItem('timerState')
+                if (stored) {
+                    const timerState = JSON.parse(stored)
+                    if (timerState.wasRunning) {
+                        const elapsed = Math.floor((Date.now() - timerState.timestamp) / 1000)
+                        const newTimeRemaining = Math.max(0, timerState.timeRemaining - elapsed)
+                        setTimeRemaining(newTimeRemaining)
+
+                        if (newTimeRemaining <= 0) {
+                            setIsRunning(false)
+                            playBeep()
+                            showNotification()
+                        }
+                    }
+                }
+            }
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }, [isRunning])
 
     // Sloka rotation effect
     useEffect(() => {
