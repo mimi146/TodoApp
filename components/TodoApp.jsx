@@ -18,6 +18,7 @@ export default function TodoApp({ user }) {
     const [todoInput, setTodoInput] = useState('')
     const [todoPriority, setTodoPriority] = useState('medium')
     const [currentFilter, setCurrentFilter] = useState('all')
+    const [currentView, setCurrentView] = useState('today') // 'today' | 'plan'
     const [timeRemaining, setTimeRemaining] = useState(25 * 60)
     const [totalTime, setTotalTime] = useState(25 * 60)
     const [isRunning, setIsRunning] = useState(false)
@@ -217,13 +218,26 @@ export default function TodoApp({ user }) {
     const handleAddTodo = async (e) => {
         e.preventDefault()
         if (todoInput.trim()) {
-            await hookAddTodo(todoInput.trim(), todoPriority)
+            let scheduledFor = null
+            if (currentView === 'plan') {
+                // Schedule for tomorrow
+                const tomorrow = new Date()
+                tomorrow.setDate(tomorrow.getDate() + 1)
+                tomorrow.setHours(0, 0, 0, 0)
+                scheduledFor = tomorrow.toISOString()
+            }
+            await hookAddTodo(todoInput.trim(), todoPriority, scheduledFor)
             setTodoInput('')
             setTodoPriority('medium')
         }
     }
 
     const handleToggleTodo = async (id) => {
+        const todo = todos.find(t => t._id === id)
+        // Trigger confetti if completing a task
+        if (todo && !todo.completed) {
+            triggerConfetti()
+        }
         await hookToggleTodo(id)
     }
 
@@ -234,8 +248,37 @@ export default function TodoApp({ user }) {
     // Priority order for sorting
     const priorityOrder = { high: 1, medium: 2, low: 3 }
 
+    // Helper to get tomorrow's date
+    const getTomorrowDate = () => {
+        const tomorrow = new Date()
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        tomorrow.setHours(0, 0, 0, 0)
+        return tomorrow
+    }
+
     const filteredTodos = todos
         .filter(todo => {
+            // First filter by view (today vs plan)
+            if (currentView === 'today') {
+                // Today view: show tasks without scheduledFor OR with scheduledFor in the past/today
+                if (todo.scheduledFor) {
+                    const scheduledDate = new Date(todo.scheduledFor)
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    if (scheduledDate > today) {
+                        return false // Hide future scheduled tasks
+                    }
+                }
+            } else if (currentView === 'plan') {
+                // Plan view: show only future scheduled tasks
+                if (!todo.scheduledFor) return false
+                const scheduledDate = new Date(todo.scheduledFor)
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+                if (scheduledDate <= today) return false
+            }
+
+            // Then filter by completion status
             if (currentFilter === 'active') return !todo.completed
             if (currentFilter === 'completed') return todo.completed
             return true
@@ -387,6 +430,110 @@ export default function TodoApp({ user }) {
         }
     }
 
+    // Confetti celebration for task completion
+    const triggerConfetti = () => {
+        const count = 150
+        const defaults = {
+            origin: { y: 0.7 }
+        }
+
+        function fire(particleRatio, opts) {
+            const confettiColors = ['#FFD700', '#FFA500', '#FF6347', '#32CD32', '#1E90FF', '#FF1493']
+            const particles = []
+
+            for (let i = 0; i < count * particleRatio; i++) {
+                particles.push({
+                    x: Math.random() * window.innerWidth,
+                    y: window.innerHeight * (Math.random() * 0.3 + 0.5),
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: -(Math.random() * 8 + 10),
+                    color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
+                    size: Math.random() * 8 + 4,
+                    rotation: Math.random() * 360,
+                    rotationSpeed: (Math.random() - 0.5) * 10,
+                    opacity: 1
+                })
+            }
+
+            // Create canvas
+            const canvas = document.createElement('canvas')
+            canvas.style.position = 'fixed'
+            canvas.style.top = '0'
+            canvas.style.left = '0'
+            canvas.style.width = '100vw'
+            canvas.style.height = '100vh'
+            canvas.style.pointerEvents = 'none'
+            canvas.style.zIndex = '9999'
+            canvas.width = window.innerWidth
+            canvas.height = window.innerHeight
+            document.body.appendChild(canvas)
+
+            const ctx = canvas.getContext('2d')
+            let animationId
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+                particles.forEach((p, index) => {
+                    // Update position
+                    p.vy += 0.3 // gravity
+                    p.x += p.vx
+                    p.y += p.vy
+                    p.rotation += p.rotationSpeed
+                    p.opacity -= 0.008
+
+                    // Draw particle
+                    ctx.save()
+                    ctx.translate(p.x, p.y)
+                    ctx.rotate((p.rotation * Math.PI) / 180)
+                    ctx.globalAlpha = p.opacity
+                    ctx.fillStyle = p.color
+
+                    // Draw square confetti
+                    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size)
+                    ctx.restore()
+
+                    // Remove dead particles
+                    if (p.opacity <= 0 || p.y > window.innerHeight) {
+                        particles.splice(index, 1)
+                    }
+                })
+
+                if (particles.length > 0) {
+                    animationId = requestAnimationFrame(animate)
+                } else {
+                    cancelAnimationFrame(animationId)
+                    document.body.removeChild(canvas)
+                }
+            }
+
+            animate()
+        }
+
+        fire(0.25, {
+            spread: 26,
+            startVelocity: 55
+        })
+        fire(0.2, {
+            spread: 60
+        })
+        fire(0.35, {
+            spread: 100,
+            decay: 0.91,
+            scalar: 0.8
+        })
+        fire(0.1, {
+            spread: 120,
+            startVelocity: 25,
+            decay: 0.92,
+            scalar: 1.2
+        })
+        fire(0.1, {
+            spread: 120,
+            startVelocity: 45
+        })
+    }
+
     // Format time display
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60)
@@ -513,10 +660,34 @@ export default function TodoApp({ user }) {
 
                 {/* Todo Section */}
                 <section className="todo-section">
+                    {/* View Toggle - Today vs Plan */}
+                    <div className="view-toggle" style={{ display: 'flex', gap: '10px', marginBottom: '1rem', justifyContent: 'center' }}>
+                        <button
+                            className={`filter-btn ${currentView === 'today' ? 'active' : ''}`}
+                            onClick={() => setCurrentView('today')}
+                            style={{ flex: 1, maxWidth: '200px' }}
+                        >
+                            📅 Today
+                        </button>
+                        <button
+                            className={`filter-btn ${currentView === 'plan' ? 'active' : ''}`}
+                            onClick={() => setCurrentView('plan')}
+                            style={{ flex: 1, maxWidth: '200px' }}
+                        >
+                            📆 {currentView === 'plan' ? 'Tomorrow Plan' : 'Plan'}
+                        </button>
+                    </div>
+
+                    {currentView === 'plan' && (
+                        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                            Tasks added here will appear tomorrow ({getTomorrowDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
+                        </div>
+                    )}
+
                     <form onSubmit={handleAddTodo} className="todo-form">
                         <input
                             type="text"
-                            placeholder="Add a new task..."
+                            placeholder={currentView === 'plan' ? 'Plan for tomorrow...' : 'Add a new task...'}
                             value={todoInput}
                             onChange={(e) => setTodoInput(e.target.value)}
                         />

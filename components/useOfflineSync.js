@@ -406,7 +406,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
 
     // --- Public Actions ---
 
-    const addTodo = async (text, priority) => {
+    const addTodo = async (text, priority, scheduledFor = null) => {
         const tempId = Date.now().toString()
         const newTodo = {
             _id: tempId,
@@ -416,24 +416,37 @@ export function useOfflineSync(initialTodos = [], user = null) {
             createdAt: new Date().toISOString()
         }
 
+        // Add scheduledFor if provided (for planned tasks)
+        if (scheduledFor) {
+            newTodo.scheduledFor = scheduledFor
+        }
+
         // Optimistic Update
         setTodos(prev => [newTodo, ...prev])
 
         if (isGuest) return // Local only
 
         if (!navigator.onLine) {
+            const payload = { text, priority }
+            if (scheduledFor) {
+                payload.scheduledFor = scheduledFor
+            }
             setQueue(prev => [...prev, {
                 type: 'ADD',
-                payload: { text, priority },
+                payload,
                 id: tempId,
                 uuid: generateUUID()
             }])
         } else {
             try {
+                const payload = { text, priority }
+                if (scheduledFor) {
+                    payload.scheduledFor = scheduledFor
+                }
                 const res = await fetch('/api/todos', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text, priority })
+                    body: JSON.stringify(payload)
                 })
 
                 if (!res.ok) {
@@ -455,9 +468,13 @@ export function useOfflineSync(initialTodos = [], user = null) {
             } catch (error) {
                 console.error('Error adding todo:', error)
                 // Fallback to queue if network failed mid-request
+                const payload = { text, priority }
+                if (scheduledFor) {
+                    payload.scheduledFor = scheduledFor
+                }
                 setQueue(prev => [...prev, {
                     type: 'ADD',
-                    payload: { text, priority },
+                    payload,
                     id: tempId,
                     uuid: generateUUID()
                 }])

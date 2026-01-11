@@ -17,6 +17,20 @@ export async function GET() {
         const client = await clientPromise
         const db = client.db('todoapp')
 
+        // Auto-migrate scheduled tasks that should appear today
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        await db.collection('todos').updateMany(
+            {
+                userId,
+                scheduledFor: { $exists: true, $ne: null, $lte: today }
+            },
+            {
+                $unset: { scheduledFor: "" }
+            }
+        )
+
         // Get current user to check admin status
         const user = await db.collection('user').findOne({ _id: new ObjectId(userId) })
         const userIsAdmin = isAdmin(user?.email)
@@ -89,7 +103,7 @@ export async function POST(request) {
         }
 
         const body = await request.json()
-        const { text, priority } = body
+        const { text, priority, scheduledFor } = body
 
         if (!text) {
             return NextResponse.json({ error: 'Todo text is required' }, { status: 400 })
@@ -104,6 +118,11 @@ export async function POST(request) {
             priority: priority || 'medium',
             completed: false,
             createdAt: new Date()
+        }
+
+        // Add scheduledFor if provided (for planned tasks)
+        if (scheduledFor) {
+            newTodo.scheduledFor = new Date(scheduledFor)
         }
 
         const result = await db.collection('todos').insertOne(newTodo)
