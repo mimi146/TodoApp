@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import clientPromise from '@/lib/mongodb'
+import getMongoClientPromise from '@/lib/mongodb'
 import { getSession } from '@/lib/auth/session'
 import { isAdmin } from '@/lib/auth/admin'
 import { ObjectId } from 'mongodb'
@@ -11,7 +11,7 @@ export async function GET() {
             return NextResponse.json({ user: null })
         }
 
-        const client = await clientPromise
+        const client = await getMongoClientPromise()
         const db = client.db('todoapp')
 
         const user = await db.collection('user').findOne(

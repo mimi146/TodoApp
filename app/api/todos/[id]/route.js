@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import clientPromise from '@/lib/mongodb'
+import getMongoClientPromise from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { getSession } from '@/lib/auth/session'
 import { isAdmin } from '@/lib/auth/admin'
@@ -21,7 +21,7 @@ export async function PUT(request, context) {
             return NextResponse.json({ error: 'Invalid todo ID format' }, { status: 400 })
         }
 
-        const client = await clientPromise
+        const client = await getMongoClientPromise()
         const db = client.db('todoapp')
 
         // Check if user is admin
@@ -67,7 +67,7 @@ export async function DELETE(request, context) {
             return NextResponse.json({ error: 'Invalid todo ID format' }, { status: 400 })
         }
 
-        const client = await clientPromise
+        const client = await getMongoClientPromise()
         const db = client.db('todoapp')
 
         // Check if user is admin
