@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import clientPromise from '@/lib/mongodb'
+import getMongoClientPromise from '@/lib/mongodb'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request) {
@@ -10,7 +10,7 @@ export async function POST(request) {
             return NextResponse.json({ error: 'All fields required' }, { status: 400 })
         }
 
-        const client = await clientPromise
+        const client = await getMongoClientPromise()
         const db = client.db('todoapp')
 
         // Find user by email

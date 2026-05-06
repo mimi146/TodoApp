@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import clientPromise from '@/lib/mongodb'
+import getMongoClientPromise from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { getSession } from '@/lib/auth/session'
 import { isAdmin } from '@/lib/auth/admin'
@@ -21,7 +21,7 @@ export async function PUT(request, context) {
             return NextResponse.json({ error: 'Invalid todo ID format' }, { status: 400 })
         }
 
-        const client = await clientPromise
+        const client = await getMongoClientPromise()
         const db = client.db('todoapp')
 
         // Check if user is admin
@@ -35,10 +35,65 @@ export async function PUT(request, context) {
             query.userId = userId.toString()
         }
 
-        const result = await db.collection('todos').updateOne(
-            query,
-            { $set: { completed: body.completed } }
-        )
+        const allowedPriorities = new Set(['low', 'medium', 'high'])
+        const set = {}
+        const unset = {}
+
+        if (typeof body.completed === 'boolean') {
+            set.completed = body.completed
+        }
+
+        if (typeof body.text === 'string') {
+            const trimmed = body.text.trim()
+            if (!trimmed) {
+                return NextResponse.json({ error: 'Todo text is required' }, { status: 400 })
+            }
+            set.text = trimmed
+        }
+
+        if (typeof body.priority === 'string' && allowedPriorities.has(body.priority)) {
+            set.priority = body.priority
+        }
+
+        if (body.scheduledFor === null) {
+            unset.scheduledFor = ''
+        } else if (body.scheduledFor) {
+            const scheduledDate = new Date(body.scheduledFor)
+            if (Number.isNaN(scheduledDate.getTime())) {
+                return NextResponse.json({ error: 'Invalid scheduledFor' }, { status: 400 })
+            }
+            set.scheduledFor = scheduledDate
+        }
+
+        if (body.plannedAt === null) {
+            unset.plannedAt = ''
+        } else if (body.plannedAt) {
+            const plannedDate = new Date(body.plannedAt)
+            if (Number.isNaN(plannedDate.getTime())) {
+                return NextResponse.json({ error: 'Invalid plannedAt' }, { status: 400 })
+            }
+            set.plannedAt = plannedDate
+        }
+
+        if (body.durationMinutes === null) {
+            unset.durationMinutes = ''
+        } else if (body.durationMinutes !== undefined) {
+            const duration = Number(body.durationMinutes)
+            if (!Number.isFinite(duration) || duration <= 0 || duration > 24 * 60) {
+                return NextResponse.json({ error: 'Invalid durationMinutes' }, { status: 400 })
+            }
+            set.durationMinutes = Math.round(duration)
+        }
+
+        if (Object.keys(set).length === 0 && Object.keys(unset).length === 0) {
+            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+        }
+
+        const updateDoc = {}
+        if (Object.keys(set).length > 0) updateDoc.$set = set
+        if (Object.keys(unset).length > 0) updateDoc.$unset = unset
+
+        const result = await db.collection('todos').updateOne(query, updateDoc)
 
         if (result.matchedCount === 0) {
             return NextResponse.json({ error: 'Todo not found' }, { status: 404 })
@@ -67,7 +122,7 @@ export async function DELETE(request, context) {
             return NextResponse.json({ error: 'Invalid todo ID format' }, { status: 400 })
         }
 
-        const client = await clientPromise
+        const client = await getMongoClientPromise()
         const db = client.db('todoapp')
 
         // Check if user is admin
