@@ -11,6 +11,7 @@ export default function TodoApp({ user }) {
         syncStatus,
         addTodo: hookAddTodo,
         toggleTodo: hookToggleTodo,
+        updateTodo: hookUpdateTodo,
         deleteTodo: hookDeleteTodo,
         refresh
     } = useOfflineSync([], user)
@@ -18,7 +19,14 @@ export default function TodoApp({ user }) {
     const [todoInput, setTodoInput] = useState('')
     const [todoPriority, setTodoPriority] = useState('medium')
     const [currentFilter, setCurrentFilter] = useState('all')
-    const [currentView, setCurrentView] = useState('today') // 'today' | 'plan'
+    const [currentView, setCurrentView] = useState('today') // 'today' | 'plan' | 'calendar'
+    const [calendarDate, setCalendarDate] = useState(() => {
+        const now = new Date()
+        const yyyy = now.getFullYear()
+        const mm = String(now.getMonth() + 1).padStart(2, '0')
+        const dd = String(now.getDate()).padStart(2, '0')
+        return `${yyyy}-${mm}-${dd}`
+    })
     const [timeRemaining, setTimeRemaining] = useState(25 * 60)
     const [totalTime, setTotalTime] = useState(25 * 60)
     const [isRunning, setIsRunning] = useState(false)
@@ -225,6 +233,16 @@ export default function TodoApp({ user }) {
                 tomorrow.setDate(tomorrow.getDate() + 1)
                 tomorrow.setHours(0, 0, 0, 0)
                 scheduledFor = tomorrow.toISOString()
+            } else if (currentView === 'calendar') {
+                const [year, month, day] = (calendarDate || '').split('-').map(Number)
+                if (year && month && day) {
+                    const selectedStart = new Date(year, month - 1, day, 0, 0, 0, 0)
+                    const todayStart = new Date()
+                    todayStart.setHours(0, 0, 0, 0)
+                    if (selectedStart > todayStart) {
+                        scheduledFor = selectedStart.toISOString()
+                    }
+                }
             }
             await hookAddTodo(todoInput.trim(), todoPriority, scheduledFor)
             setTodoInput('')
@@ -254,6 +272,34 @@ export default function TodoApp({ user }) {
         tomorrow.setDate(tomorrow.getDate() + 1)
         tomorrow.setHours(0, 0, 0, 0)
         return tomorrow
+    }
+
+    const getLocalStartOfDayFromYMD = (ymd) => {
+        const [year, month, day] = (ymd || '').split('-').map(Number)
+        if (!year || !month || !day) return null
+        return new Date(year, month - 1, day, 0, 0, 0, 0)
+    }
+
+    const getLocalYMD = (date) => {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null
+        const yyyy = date.getFullYear()
+        const mm = String(date.getMonth() + 1).padStart(2, '0')
+        const dd = String(date.getDate()).padStart(2, '0')
+        return `${yyyy}-${mm}-${dd}`
+    }
+
+    const getScheduleMetaForDate = (ymd) => {
+        const selectedStart = getLocalStartOfDayFromYMD(ymd)
+        if (!selectedStart) return { scheduledFor: null, selectedStart: null, todayStart: null }
+
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
+
+        return {
+            selectedStart,
+            todayStart,
+            scheduledFor: selectedStart > todayStart ? selectedStart.toISOString() : null
+        }
     }
 
     const filteredTodos = todos
@@ -292,6 +338,144 @@ export default function TodoApp({ user }) {
             const dateB = new Date(b.createdAt || 0)
             return dateB - dateA
         })
+
+    const getPlannedTimeValue = (plannedAt) => {
+        if (!plannedAt) return ''
+        const date = new Date(plannedAt)
+        if (Number.isNaN(date.getTime())) return ''
+        const hh = String(date.getHours()).padStart(2, '0')
+        const mm = String(date.getMinutes()).padStart(2, '0')
+        return `${hh}:${mm}`
+    }
+
+    const getCalendarTodosForDay = () => {
+        const selectedStart = getLocalStartOfDayFromYMD(calendarDate)
+        if (!selectedStart) return []
+
+        const selectedKey = getLocalYMD(selectedStart)
+        const todayKey = getLocalYMD(new Date())
+        const isToday = selectedKey === todayKey
+
+        return todos
+            .filter(todo => {
+                const plannedKey = todo.plannedAt ? getLocalYMD(new Date(todo.plannedAt)) : null
+                const scheduledKey = todo.scheduledFor ? getLocalYMD(new Date(todo.scheduledFor)) : null
+
+                const matchesDay =
+                    plannedKey === selectedKey ||
+                    (!todo.plannedAt && scheduledKey === selectedKey) ||
+                    (isToday && !todo.plannedAt && !todo.scheduledFor)
+
+                if (!matchesDay) return false
+
+                if (currentFilter === 'active') return !todo.completed
+                if (currentFilter === 'completed') return todo.completed
+                return true
+            })
+    }
+
+    const calendarTodos = currentView === 'calendar' ? getCalendarTodosForDay() : []
+
+    const scheduledCalendarTodos = calendarTodos
+        .filter(t => !!t.plannedAt)
+        .sort((a, b) => new Date(a.plannedAt) - new Date(b.plannedAt))
+
+    const unscheduledCalendarTodos = calendarTodos
+        .filter(t => !t.plannedAt)
+        .sort((a, b) => {
+            const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority]
+            if (priorityDiff !== 0) return priorityDiff
+            const dateA = new Date(a.createdAt || 0)
+            const dateB = new Date(b.createdAt || 0)
+            return dateB - dateA
+        })
+
+    const scheduleTodoAtTime = async (todoId, timeValue) => {
+        const selectedStart = getLocalStartOfDayFromYMD(calendarDate)
+        if (!selectedStart || !timeValue) return
+
+        const [hour, minute] = timeValue.split(':').map(Number)
+        if (!Number.isFinite(hour) || !Number.isFinite(minute)) return
+
+        const plannedAt = new Date(
+            selectedStart.getFullYear(),
+            selectedStart.getMonth(),
+            selectedStart.getDate(),
+            hour,
+            minute,
+            0,
+            0
+        ).toISOString()
+
+        const { scheduledFor } = getScheduleMetaForDate(calendarDate)
+        await hookUpdateTodo(todoId, { plannedAt, scheduledFor })
+    }
+
+    const setTodoDurationMinutes = async (todoId, durationMinutes) => {
+        const duration = Number(durationMinutes)
+        if (!Number.isFinite(duration) || duration <= 0 || duration > 24 * 60) return
+        await hookUpdateTodo(todoId, { durationMinutes: Math.round(duration) })
+    }
+
+    const clearTodoSchedule = async (todoId) => {
+        const { scheduledFor } = getScheduleMetaForDate(calendarDate)
+        await hookUpdateTodo(todoId, { plannedAt: null, scheduledFor })
+    }
+
+    const getNextAvailableStartTime = () => {
+        const selectedStart = getLocalStartOfDayFromYMD(calendarDate)
+        if (!selectedStart) return null
+
+        let cursor = new Date(
+            selectedStart.getFullYear(),
+            selectedStart.getMonth(),
+            selectedStart.getDate(),
+            9,
+            0,
+            0,
+            0
+        )
+
+        for (const todo of scheduledCalendarTodos) {
+            const start = new Date(todo.plannedAt)
+            if (Number.isNaN(start.getTime())) continue
+            const duration = Number(todo.durationMinutes) || 25
+            const end = new Date(start.getTime() + duration * 60 * 1000)
+            if (end > cursor) cursor = end
+        }
+
+        return cursor
+    }
+
+    const scheduleTodoNext = async (todo) => {
+        const start = getNextAvailableStartTime()
+        if (!start) return
+        const { scheduledFor } = getScheduleMetaForDate(calendarDate)
+        const duration = Number(todo.durationMinutes) || 25
+        await hookUpdateTodo(todo._id, {
+            plannedAt: start.toISOString(),
+            durationMinutes: Math.round(duration),
+            scheduledFor
+        })
+    }
+
+    const autoPlanDay = async () => {
+        const start = getNextAvailableStartTime()
+        if (!start) return
+
+        const { scheduledFor } = getScheduleMetaForDate(calendarDate)
+        let cursor = start
+
+        for (const todo of unscheduledCalendarTodos) {
+            const duration = Number(todo.durationMinutes) || 25
+            await hookUpdateTodo(todo._id, {
+                plannedAt: cursor.toISOString(),
+                durationMinutes: Math.round(duration),
+                scheduledFor
+            })
+            cursor = new Date(cursor.getTime() + Math.round(duration) * 60 * 1000)
+        }
+    }
 
 
     // Timer functions
@@ -660,7 +844,7 @@ export default function TodoApp({ user }) {
 
                 {/* Todo Section */}
                 <section className="todo-section">
-                    {/* View Toggle - Today vs Plan */}
+                    {/* View Toggle - Today vs Plan vs Calendar */}
                     <div className="view-toggle" style={{ display: 'flex', gap: '10px', marginBottom: '1rem', justifyContent: 'center' }}>
                         <button
                             className={`filter-btn ${currentView === 'today' ? 'active' : ''}`}
@@ -676,6 +860,13 @@ export default function TodoApp({ user }) {
                         >
                             📆 {currentView === 'plan' ? 'Tomorrow Plan' : 'Plan'}
                         </button>
+                        <button
+                            className={`filter-btn ${currentView === 'calendar' ? 'active' : ''}`}
+                            onClick={() => setCurrentView('calendar')}
+                            style={{ flex: 1, maxWidth: '200px' }}
+                        >
+                            🗓️ Calendar
+                        </button>
                     </div>
 
                     {currentView === 'plan' && (
@@ -684,10 +875,42 @@ export default function TodoApp({ user }) {
                         </div>
                     )}
 
+                    {currentView === 'calendar' && (
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                            <input
+                                type="date"
+                                value={calendarDate}
+                                onChange={(e) => setCalendarDate(e.target.value)}
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '8px',
+                                    color: 'var(--text-primary)',
+                                    padding: '8px 12px'
+                                }}
+                            />
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={autoPlanDay}
+                                disabled={unscheduledCalendarTodos.length === 0}
+                                style={{ padding: '10px 14px' }}
+                            >
+                                Auto Plan Day
+                            </button>
+                        </div>
+                    )}
+
                     <form onSubmit={handleAddTodo} className="todo-form">
                         <input
                             type="text"
-                            placeholder={currentView === 'plan' ? 'Plan for tomorrow...' : 'Add a new task...'}
+                            placeholder={
+                                currentView === 'plan'
+                                    ? 'Plan for tomorrow...'
+                                    : currentView === 'calendar'
+                                        ? `Add a task for ${calendarDate}...`
+                                        : 'Add a new task...'
+                            }
                             value={todoInput}
                             onChange={(e) => setTodoInput(e.target.value)}
                         />
@@ -725,6 +948,129 @@ export default function TodoApp({ user }) {
                             <li style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
                                 Loading todos...
                             </li>
+                        ) : currentView === 'calendar' ? (
+                            calendarTodos.length === 0 ? (
+                                <li style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                                    No tasks for this day yet.
+                                </li>
+                            ) : (
+                                <>
+                                    {scheduledCalendarTodos.length > 0 && (
+                                        <li style={{ padding: '10px 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                            Scheduled
+                                        </li>
+                                    )}
+                                    {scheduledCalendarTodos.map(todo => (
+                                        <li
+                                            key={todo._id}
+                                            className={`todo-item ${todo.completed ? 'completed' : ''}`}
+                                            style={{ display: 'flex', gap: '10px', alignItems: 'center' }}
+                                        >
+                                            <input
+                                                type="time"
+                                                value={getPlannedTimeValue(todo.plannedAt)}
+                                                onChange={(e) => scheduleTodoAtTime(todo._id, e.target.value)}
+                                                style={{
+                                                    width: '92px',
+                                                    background: 'rgba(255, 255, 255, 0.1)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                    borderRadius: '8px',
+                                                    color: 'var(--text-primary)',
+                                                    padding: '6px 8px'
+                                                }}
+                                            />
+                                            <select
+                                                value={todo.durationMinutes || 25}
+                                                onChange={(e) => setTodoDurationMinutes(todo._id, e.target.value)}
+                                                style={{
+                                                    width: '90px',
+                                                    background: 'rgba(255, 255, 255, 0.1)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                    borderRadius: '8px',
+                                                    color: 'var(--text-primary)',
+                                                    padding: '6px 8px'
+                                                }}
+                                                title="Duration (minutes)"
+                                            >
+                                                <option value={15}>15m</option>
+                                                <option value={25}>25m</option>
+                                                <option value={30}>30m</option>
+                                                <option value={45}>45m</option>
+                                                <option value={60}>60m</option>
+                                                <option value={90}>90m</option>
+                                            </select>
+                                            <input
+                                                type="checkbox"
+                                                className="todo-checkbox"
+                                                checked={todo.completed}
+                                                onChange={() => handleToggleTodo(todo._id)}
+                                            />
+                                            <span
+                                                className="todo-text"
+                                                onClick={() => handleToggleTodo(todo._id)}
+                                                style={{ cursor: 'pointer', flex: 1 }}
+                                            >
+                                                {todo.text}
+                                            </span>
+                                            <span className={`priority-badge ${todo.priority}`}>
+                                                {todo.priority}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={() => clearTodoSchedule(todo._id)}
+                                                style={{ padding: '8px 10px' }}
+                                            >
+                                                Clear
+                                            </button>
+                                            <button onClick={() => handleDeleteTodo(todo._id)} className="delete-btn">
+                                                Delete
+                                            </button>
+                                        </li>
+                                    ))}
+
+                                    {unscheduledCalendarTodos.length > 0 && (
+                                        <li style={{ padding: '10px 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                            Unscheduled
+                                        </li>
+                                    )}
+                                    {unscheduledCalendarTodos.map(todo => (
+                                        <li
+                                            key={todo._id}
+                                            className={`todo-item ${todo.completed ? 'completed' : ''}`}
+                                            style={{ display: 'flex', gap: '10px', alignItems: 'center' }}
+                                        >
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={() => scheduleTodoNext(todo)}
+                                                style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}
+                                            >
+                                                Schedule
+                                            </button>
+                                            <input
+                                                type="checkbox"
+                                                className="todo-checkbox"
+                                                checked={todo.completed}
+                                                onChange={() => handleToggleTodo(todo._id)}
+                                            />
+                                            <span
+                                                className="todo-text"
+                                                onClick={() => handleToggleTodo(todo._id)}
+                                                style={{ cursor: 'pointer', flex: 1 }}
+                                            >
+                                                {todo.text}
+                                            </span>
+                                            <span className={`priority-badge ${todo.priority}`}>
+                                                {todo.priority}
+                                            </span>
+                                            <button onClick={() => handleDeleteTodo(todo._id)} className="delete-btn">
+                                                Delete
+                                            </button>
+                                        </li>
+                                    ))}
+                                </>
+                            )
                         ) : filteredTodos.length === 0 ? (
                             <li style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
                                 No todos yet. Add one above!

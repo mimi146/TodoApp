@@ -487,48 +487,59 @@ export function useOfflineSync(initialTodos = [], user = null) {
         const todo = todos.find(t => t._id === id)
         if (!todo) return
 
-        const newCompleted = !todo.completed
-        const updatedItem = { ...todo, completed: newCompleted }
+        return updateTodo(id, { completed: !todo.completed })
+    }
+
+    const updateTodo = async (id, patch) => {
+        const todo = todos.find(t => t._id === id)
+        if (!todo) return
+
+        const sanitizedPatch = {}
+        for (const [key, value] of Object.entries(patch || {})) {
+            if (value !== undefined) {
+                sanitizedPatch[key] = value
+            }
+        }
+
+        const updatedItem = { ...todo, ...sanitizedPatch }
 
         // Optimistic Update
-        setTodos(prev => prev.map(t => t._id === id ? { ...t, completed: newCompleted } : t))
+        setTodos(prev => prev.map(t => t._id === id ? { ...t, ...sanitizedPatch } : t))
 
         if (isGuest) return // Local only
 
         if (!navigator.onLine) {
             setQueue(prev => [...prev, {
                 type: 'UPDATE',
-                payload: { completed: newCompleted },
+                payload: sanitizedPatch,
                 id,
                 uuid: generateUUID()
             }])
-        } else {
-            try {
-                const res = await fetch(`/api/todos/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ completed: newCompleted })
-                })
-                if (!res.ok) throw new Error(`Failed to update: ${res.status}`)
+            return
+        }
 
-                // Log success for consistency
-                mutationLogRef.current.set(id, {
-                    type: 'UPDATE',
-                    item: updatedItem,
-                    timestamp: Date.now()
-                })
-                saveMutationLog()
+        try {
+            const res = await fetch(`/api/todos/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(sanitizedPatch)
+            })
+            if (!res.ok) throw new Error(`Failed to update: ${res.status}`)
 
-            } catch (error) {
-                // Fallback to queue
-                setQueue(prev => [...prev, {
-                    type: 'UPDATE',
-                    payload: { completed: newCompleted },
-                    id,
-                    uuid: generateUUID()
-                }])
-                setSyncStatus('offline')
-            }
+            mutationLogRef.current.set(id, {
+                type: 'UPDATE',
+                item: updatedItem,
+                timestamp: Date.now()
+            })
+            saveMutationLog()
+        } catch (error) {
+            setQueue(prev => [...prev, {
+                type: 'UPDATE',
+                payload: sanitizedPatch,
+                id,
+                uuid: generateUUID()
+            }])
+            setSyncStatus('offline')
         }
     }
 
@@ -577,6 +588,7 @@ export function useOfflineSync(initialTodos = [], user = null) {
         syncStatus,
         addTodo,
         toggleTodo,
+        updateTodo,
         deleteTodo,
         refresh: fetchLatestTodos
     }

@@ -103,7 +103,7 @@ export async function POST(request) {
         }
 
         const body = await request.json()
-        const { text, priority, scheduledFor } = body
+        const { text, priority, scheduledFor, plannedAt, durationMinutes } = body
 
         if (!text) {
             return NextResponse.json({ error: 'Todo text is required' }, { status: 400 })
@@ -123,6 +123,22 @@ export async function POST(request) {
         // Add scheduledFor if provided (for planned tasks)
         if (scheduledFor) {
             newTodo.scheduledFor = new Date(scheduledFor)
+        }
+
+        if (plannedAt) {
+            const plannedDate = new Date(plannedAt)
+            if (Number.isNaN(plannedDate.getTime())) {
+                return NextResponse.json({ error: 'Invalid plannedAt' }, { status: 400 })
+            }
+            newTodo.plannedAt = plannedDate
+        }
+
+        if (durationMinutes !== undefined) {
+            const duration = Number(durationMinutes)
+            if (!Number.isFinite(duration) || duration <= 0 || duration > 24 * 60) {
+                return NextResponse.json({ error: 'Invalid durationMinutes' }, { status: 400 })
+            }
+            newTodo.durationMinutes = Math.round(duration)
         }
 
         const result = await db.collection('todos').insertOne(newTodo)
